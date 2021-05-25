@@ -1,0 +1,23 @@
+# If python build in source tree
+build/*
+dist/*
+*.egg-info
+**/__pycache__
+
+# Python compiled
+*.pyc
+*.pyd
+*.pyo
+
+#input and output data
+*.root
+
+# editor backups/cached
+*.swp
+*~
+*.vscode
+**/.mypy_cache
+setup.cfg
+
+# macOS
+.DS_Store
