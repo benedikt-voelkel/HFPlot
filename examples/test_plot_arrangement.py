@@ -3,14 +3,14 @@ from ROOT import TFile
 from hfplot.plot import ROOTFigure, make_equal_grid
 from hfplot.style import generate_styles
 
-file_name = "myFile1"
-hist_name = "histName1"
+file_name = "/path/to/rootfile"
+hist_name = "histName"
 
 file_1 = TFile(file_name, "READ")
 hist_1 = file_1.Get(hist_name)
 
-file_name = "myFile2"
-hist_name = "histName2"
+file_name = "/path/to/rootfile"
+hist_name = "histName"
 
 file_2 = TFile(file_name, "READ")
 hist_2 = file_2.Get(hist_name)
@@ -20,7 +20,7 @@ hist_2 = file_2.Get(hist_name)
 styles = generate_styles(5, markerstyles=[34])
 
 # the overall figure with a grid of 3 columns and 4 rows (default is 1 column and 1 row)
-figure = ROOTFigure("MyPlot", 3, 4, size=(600, 600), column_margin=(0.05, 0.025))
+figure = ROOTFigure(3, 4, size=(600, 600), column_margin=(0.05, 0.025))
 
 # define a plot from cell (1, 1) to cell (2, 2)
 figure.define_plot(1, 1, 2, 2)

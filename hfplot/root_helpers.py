@@ -1,13 +1,44 @@
 import sys
 
 from ROOT import TH1
+from ROOT import gROOT
 
 from hfplot.logger import get_logger
 
+
+class ROOTObjectStore:
+    __instance = None
+
+    @staticmethod
+    def get_instance():
+        if ROOTObjectStore.__instance is None:
+            ROOTObjectStore()
+
+        return ROOTObjectStore.__instance
+
+    def __init__(self):
+        self._name_count = {}
+        ROOTObjectStore.__instance = self
+
+    def create_name(self, object, proposed_name=None):
+        name = proposed_name if proposed_name else object.GetName()
+        if name not in self._name_count:
+            self._name_count[name] = 0
+        else:
+            self._name_count[name] += 1
+        return f"{name}_{self._name_count[name]}"
+
+
+def get_root_object_store():
+    return ROOTObjectStore.get_instance()
+
+
+
+
+
 def clone_root(object, suffix="clone", name=None):
-    obj = object.Clone(f"{object.GetName()}_{suffix}")
-    if name is not None:
-        obj.SetName(name)
+    name = get_root_object_store().create_name(object, name)
+    obj = object.Clone(name)
     return obj
 
 

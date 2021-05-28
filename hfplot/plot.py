@@ -15,6 +15,8 @@ configure_logger(True)
 SCALE_BASE = 600 * 600
 
 
+
+
 class PlotSpec:
     def __init__(self):
 
@@ -54,7 +56,14 @@ class FigureSpec:
     """matplotlibify
     https://matplotlib.org/stable/_modules/matplotlib/gridspec.html
     """
+
+    FIGURE_NAME_BASE = "Figure"
+    N_FIGURES = 0
+
     def __init__(self, n_cols, n_rows, height_ratios=None, width_ratios=None, **kwargs):
+
+        self.name = f"{self.FIGURE_NAME_BASE}_{self.N_FIGURES}"
+        self.N_FIGURES += 1
 
         # Size in pixels
         self.size = kwargs.pop("size", (300, 300))
@@ -73,6 +82,8 @@ class FigureSpec:
 
         self._plot_specs = []
 
+        self._current_plot = None
+
         self.logger = get_logger()
 
 
@@ -85,6 +96,7 @@ class FigureSpec:
         elif len(ratios) != self.n_rows:
             raise ValueError(f"Expecting number of ratios ({len(ratios)}) to be the same as number of rows ({self.n_rows})")
         self._height_ratios = ratios
+        print(self._height_ratios)
 
 
     def __make_width_ratios(self, ratios):
@@ -192,6 +204,7 @@ class FigureSpec:
         for i in range(row_low):
             rel_bottom += self._height_ratios[i] / sum_height_ratios
         for i in range(self.n_rows - 1, row_up, -1):
+            print(i, i)
             rel_top -= self._height_ratios[i] / sum_height_ratios
 
         for i in range(col_low):
@@ -201,6 +214,7 @@ class FigureSpec:
 
         plot_spec = PlotSpec()
         plot_spec._parent_figure_spec = self
+        print(rel_left, rel_bottom, rel_right, rel_top)
         plot_spec._rel_coordinates = (rel_left, rel_bottom, rel_right, rel_top)
         plot_spec._column_margins = (self._column_margins[col_low][0], self._column_margins[col_up][1])
         plot_spec._row_margins = (self._row_margins[row_low][0], self._row_margins[row_up][1])
@@ -238,6 +252,12 @@ class FigureSpec:
         self._current_plot._share_x = share_x
         self._current_plot._share_y = share_y
 
+        return self._current_plot
+
+    def change_plot(self, plot_id):
+        if len(self._plot_specs) <= plot_id:
+            raise ValueError(f"Attempt to change to plot {plot_id} but only {len(self._plot_specs)} plots are defined.")
+        self._current_plot = self._plot_specs[plot_id]
         return self._current_plot
 
 
@@ -374,6 +394,7 @@ class ROOTPlot(PlotSpec):
 
             frame_string = f";{x_axis.title};{y_axis.title}"
             frame = pad.DrawFrame(x_low, y_low, x_up, y_up, frame_string)
+            frame.SetName
             self.axes[0].limits[0] = x_low
             self.axes[0].limits[1] = x_up
             self.axes[1].limits[0] = y_low
@@ -403,7 +424,11 @@ class ROOTPlot(PlotSpec):
             self.legend.SetY1(y2 - 0.03 * entries)
 
         def __adjust_text_size(self, size):
-            return size / (self._rel_coordinates[3] - self._rel_coordinates[1])
+            #return self._parent_figure_spec.size[1] * size / (self.pad.GetWh() * self.pad.GetAbsHNDC())
+            size = size / ((self._rel_coordinates[3] - self._rel_coordinates[1]))
+            # print(self._row_margins[0] + self._row_margins[1])
+            # print(size)
+            return size
 
         def __adjust_row_margin(self, margin):
             return margin / (self._rel_coordinates[3] - self._rel_coordinates[1])
@@ -438,6 +463,7 @@ class ROOTPlot(PlotSpec):
 
 
         def create(self, name, **kwargs):
+            self.name = name
             self.pad = TPad(name, "", *self._rel_coordinates)
             self.pad.Draw()
             self.pad.cd()
@@ -452,29 +478,26 @@ class ROOTPlot(PlotSpec):
             self.pad.SetTickx(1)
             self.pad.SetTicky(1)
             self.__style_objects(**kwargs)
-            self.__create_legends()
+            #self.__create_legends()
 
             if self.legend:
                 kwargs["reserve_ndc_top"] = 1 - self.legend.GetY1()
             self.frame = self.__create_frame(self.pad, self.objects, self.axes[0], self.axes[1], **kwargs)
+            self.frame.SetName(f"{self.name}_frame")
 
             self.__style_frame()
-
             self.__draw_objects()
             self.__draw_legends()
 
 
 class ROOTFigure(FigureSpec):
-    def __init__(self, name, n_cols, n_rows, height_ratios=None, width_ratios=None, **kwargs):
+    def __init__(self, n_cols, n_rows, height_ratios=None, width_ratios=None, **kwargs):
         super().__init__(n_cols, n_rows, height_ratios=height_ratios, width_ratios=width_ratios, **kwargs)
-
-        self.name = name
 
         self._canvas = None
 
     def add_plot_spec(self, plot_spec):
         self._plot_specs.append(ROOTPlot(orig=plot_spec))
-
 
 
     def add_object(self, object, style=None, label=None):
@@ -493,6 +516,7 @@ class ROOTFigure(FigureSpec):
         for i, ps in enumerate(self._plot_specs):
             self._canvas.cd()
             ps.create(f"{self.name}_pad_{i}")
+            self._canvas.Update()
 
 
     def save(self, where):
@@ -516,18 +540,48 @@ class Axis:
 
 
 
-def make_equal_grid(name, n_cols_rows, margin_left, margin_bottom, margin_right=0, margin_top=0, **kwargs):
+def make_grid(n_cols_rows, margin_left, margin_bottom, margin_right=0.05, margin_top=0.05, figure_class=ROOTFigure, **kwargs):
     size = kwargs.pop("size", (600, 600))
-    width_ratios = [1 + margin_left * n_cols_rows] + [1] * (n_cols_rows - 1)
-    height_ratios = [1 + margin_bottom * n_cols_rows] + [1] * (n_cols_rows - 1)
-    column_margin = [(margin_left, 0)] + [(0, 0)] * (n_cols_rows - 1)
-    row_margin = [(margin_bottom, 0)] + [(0, 0)] * (n_cols_rows - 1)
+    try:
+        iter(n_cols_rows)
+        n_cols = n_cols_rows[0]
+        n_rows = n_cols_rows[1]
+    except TypeError:
+        n_rows = n_cols_rows
+        n_cols = n_cols_rows
+
+    non_margin = 1 - margin_top
+    non_margin = non_margin / n_rows
+
+    width_ratios = [1 + margin_left * n_cols] + [1] * (n_cols - 1)
+    height_ratios = [1 + margin_bottom * n_rows]  + [1] * (n_rows - 1)
+    column_margin = [(margin_left, 0)] + [(0, 0)] * (n_cols - 1)
+    row_margin = [(margin_bottom, 0)] + [(0, 0)] * (n_rows - 1)
 
     column_margin[-1] = (column_margin[-1][0], margin_right)
     row_margin[-1] = (row_margin[-1][0], margin_top)
 
-    width_ratios[-1] = 1 + margin_right * n_cols_rows
-    height_ratios[-1] = 1 + margin_top * n_cols_rows
+    width_ratios[-1] = 1 + margin_right * n_cols
+    height_ratios[-1] = 1 + margin_top * n_rows
 
-    return ROOTFigure(name, n_cols_rows, n_cols_rows, height_ratios=height_ratios, width_ratios=width_ratios,
+    print(height_ratios)
+
+    figure = figure_class(n_cols_rows, n_cols_rows, height_ratios=height_ratios, width_ratios=width_ratios,
                       column_margin=column_margin, row_margin=row_margin, size=size)
+
+
+    share_x = None
+    share_y = None
+    for i in range(n_rows):
+        for j in range(n_cols):
+            if i == 0:
+                share_x = None
+            if j == 0:
+                share_y = None
+            plot = figure.define_plot(j, i, share_x=share_x, share_y=share_y)
+            if i == 0:
+                share_x = plot
+            if j == 0:
+                share_y = plot
+
+    return figure
