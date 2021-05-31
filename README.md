@@ -1,5 +1,8 @@
 # README
 
+## Requirements
+
+To fully make use of this, `ROOT` Python bindings are required.
 
 ## Setup
 
@@ -8,7 +11,7 @@ Set up via
 pip install -e .
 ```
 
-As usual, it is recommended to do so inside a `Python virtualenv`.
+As usual, it is recommended to do so inside a Python `virtualenv`.
 
 ## Usage
 
