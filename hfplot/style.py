@@ -21,7 +21,7 @@ FILLCOLOR_DEFAULTS = copy(COLOR_DEFAULTS)
 FILLALPHA_DEFAULTS = [1]
 
 
-class Style:
+class ROOTStyle1D:
     def __init__(self):
         self.linewidth = None
         self.linestyle = None
@@ -50,9 +50,11 @@ class Style:
             return
         self._fillstyle = value
 
+def generate_styles_1d(n_styles, **kwargs):
+    # 1-dimensional object
 
-def generate_styles(n_styles, **kwargs):
     styles = []
+    
     linewidths = kwargs.pop("linewidths", LINEWIDTH_DEFAULTS)
     linestyles = kwargs.pop("linestyles", LINESTYLE_DEFAULTS)
     linecolors = kwargs.pop("linecolors", LINECOLOR_DEFAULTS)
@@ -66,7 +68,7 @@ def generate_styles(n_styles, **kwargs):
     fillalphas = kwargs.pop("fillalpha", FILLALPHA_DEFAULTS)
 
     for i in range(n_styles):
-        new_style = Style()
+        new_style = ROOTStyle1D()
         new_style.linewidth = linewidths[i % len(linewidths)]
         new_style.linestyle = linestyles[i % len(linestyles)]
         new_style.linecolor = linecolors[i % len(linecolors)]
@@ -78,3 +80,12 @@ def generate_styles(n_styles, **kwargs):
         new_style.fillalpha = fillalphas[i % len(fillalphas)]
         styles.append(new_style)
     return styles
+
+
+def generate_styles(n_styles, **kwargs):
+    dim = kwargs.pop("dim", 1)
+
+    if dim == 1:
+        return generate_styles_1d(n_styles, **kwargs)
+    get_logger().warning("Style are only supported for 1d and 2d objects")
+    return [None] * n_styles
