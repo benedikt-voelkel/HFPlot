@@ -3,7 +3,7 @@
 
 from math import sqrt
 
-from ROOT import TCanvas, TLegend, TPad # pylint: disable=no-name-in-module
+from ROOT import TCanvas, TLegend, TPad, TPaveText # pylint: disable=no-name-in-module
 from ROOT import gROOT, gDirectory, gPad, TDirectory # pylint: disable=no-name-in-module
 
 from hfplot.plot_spec import FigureSpec, PlotSpec
@@ -35,6 +35,9 @@ class ROOTPlot(PlotSpec): # pylint: disable=too-many-instance-attributes
         self.objects = None
         # Styles to be used for the styles
         self.styles = None
+
+        # text to be added
+        self.pave_boxes = None
 
         # legend
         self.legend = None
@@ -199,10 +202,15 @@ class ROOTPlot(PlotSpec): # pylint: disable=too-many-instance-attributes
         self.axes[1].limits[0] = y_low
         self.axes[1].limits[1] = y_up
 
+        print(y_low, y_up)
+
         # Give the frame a unique name, for now just because we do it for
         # ROOT related object
         self.frame.SetName(f"{self.name}_frame")
 
+
+    def __adjust_text_size(self, size):
+        return int(max(1, size * self._parent_figure_spec.size[1]))
 
     def __adjust_text_size_x(self, size):
         """Helper method to adjust text sizes for x-axis' title and labels
@@ -266,7 +274,15 @@ class ROOTPlot(PlotSpec): # pylint: disable=too-many-instance-attributes
                           1 - self.__adjust_row_margin(self._row_margins[1]))
         return x_low, y_low, x_up, y_up
 
+    def __adjust_coordinate_x(self, x_in):
+        return map_value(x_in, 0, 1,
+                          self.__adjust_column_margin(self._column_margins[0]),
+                          1 - self.__adjust_column_margin(self._column_margins[1]))
 
+    def __adjust_coordinate_y(self, y_in):
+        return map_value(y_in, 0, 1,
+                          self.__adjust_row_margin(self._row_margins[0]),
+                          1 - self.__adjust_row_margin(self._row_margins[1]))
 
     def __create_legends(self):
         """Create legend(s)
@@ -286,13 +302,14 @@ class ROOTPlot(PlotSpec): # pylint: disable=too-many-instance-attributes
         n_labels = int(n_labels / self._legend_n_columns)
 
         # Get the same legend positioning relative to the axes in the plot
-        x_low, y_low, x_up, y_up = self.__adjust_legend_coordinates(0.7, 0.6, 0.89, 0.89)
-        y_low = y_up - 0.03 * n_labels
-        self.legend = TLegend(x_low, y_low, x_up, y_up)
+        x_low, y_low, x_up, y_up = self.__adjust_legend_coordinates(0.5, 0.7, 0.89, 0.89)
+        self.legend = TLegend(x_low, y_up - 0.04 * n_labels, x_up, y_up)
         self.legend.SetNColumns(self._legend_n_columns)
         # Make legend transparent and remove border
         self.legend.SetFillStyle(0)
         self.legend.SetLineWidth(0)
+        self.legend.SetTextSize(self.__adjust_text_size(0.015))
+        self.legend.SetTextFont(63)
 
         for obj, lab in zip(self.objects, self.labels):
             if lab is None:
@@ -316,21 +333,50 @@ class ROOTPlot(PlotSpec): # pylint: disable=too-many-instance-attributes
             self.frame.GetXaxis().SetTitleSize(0)
             self.frame.GetXaxis().SetLabelSize(0)
         else:
-            self.frame.GetXaxis().SetTitleSize(self.__adjust_text_size_x( \
-            self.axes[0].title_size))
-            self.frame.GetXaxis().SetLabelSize(self.__adjust_text_size_x( \
-            self.axes[0].label_size))
+            axis = self.frame.GetXaxis()
+            axis.SetLabelFont(63)
+            axis.SetTitleFont(63)
+            axis.SetTitleSize(self.__adjust_text_size(self.axes[0].title_size))
+            axis.SetLabelSize(self.__adjust_text_size(self.axes[0].label_size))
             # TODO properly compute offsets
         if self._share_y:
             # no labels or title in case of shared y-axis
             self.frame.GetYaxis().SetTitleSize(0)
             self.frame.GetYaxis().SetLabelSize(0)
         else:
-            self.frame.GetYaxis().SetTitleSize(self.__adjust_text_size_y( \
-            self.axes[1].title_size))
-            self.frame.GetYaxis().SetLabelSize(self.__adjust_text_size_y( \
-            self.axes[1].label_size))
+            axis = self.frame.GetYaxis()
+            axis.SetLabelFont(63)
+            axis.SetTitleFont(63)
+            axis.SetTitleSize(self.__adjust_text_size(self.axes[1].title_size))
+            axis.SetLabelSize(self.__adjust_text_size(self.axes[1].label_size))
             # TODO properly compute offsets
+
+
+    def __draw_text(self):
+        """Draw potential text into pad
+        """
+        if not self._texts:
+            return
+
+        if not self.pave_boxes:
+            self.pave_boxes = []
+
+        for text in self._texts:
+            pave_box = TPaveText(self.__adjust_coordinate_x(text.x_low),
+                                 self.__adjust_coordinate_y(text.y_low),
+                                 self.__adjust_coordinate_x(1),
+                                 self.__adjust_coordinate_y(text.y_low + text.size),
+                                 "brNDC")
+            pave_box.SetLineWidth(0)
+            #pave_box.FillStyle(0)
+            pave_box.AddText(text.text)
+            pave_box.SetBorderSize(0)
+            pave_box.SetFillStyle(0)
+            pave_box.SetTextAlign(10)
+            pave_box.SetTextFont(63)
+            pave_box.SetTextSizePixels(self.__adjust_text_size(text.size))
+            self.pave_boxes.append(pave_box)
+            pave_box.Draw()
 
 
     def create(self, name, **kwargs):
@@ -344,10 +390,9 @@ class ROOTPlot(PlotSpec): # pylint: disable=too-many-instance-attributes
         """
         if not self.objects:
             return
+
         self.name = name
-
         self.pad = TPad(name, "", *self._rel_coordinates)
-
         self.pad.Draw()
 
         # remember if another TPad was active before
@@ -385,6 +430,7 @@ class ROOTPlot(PlotSpec): # pylint: disable=too-many-instance-attributes
         # draw objects and legends
         self.__draw_objects()
         self.__draw_legends()
+        self.__draw_text()
 
         if prev_pad:
             # Don't spoil what the user might want to do afterwards

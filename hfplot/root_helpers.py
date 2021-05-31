@@ -15,6 +15,13 @@ ROOT_OBJECTS_HIST_1D = (TH1C, TH1S, TH1I, TH1F, TH1D)
 # Need to exclude in case of 1D since they are derived from TF1
 ROOT_OBJECTS_NOT_1D = (TF2, TF3)
 
+def is_1d(root_object):
+    """Test whether a ROOT object is 1D histogram-like
+    """
+    if isinstance(root_object, ROOT_OBJECTS_1D) \
+    and not isinstance(root_object, ROOT_OBJECTS_NOT_1D):
+        return True
+    return False
 
 class ROOTObjectStore:
     """Replay a singleton-like ROOT object store
@@ -103,26 +110,27 @@ def find_boundaries_TH1(histo, x_low=None, x_up=None, y_low=None, y_up=None): # 
 
     # TODO Quite some code duplication. Fix that
 
-    # To restore x-range
-    x_low_tmp = histo.GetXaxis().GetXmin()
-    x_up_tmp = histo.GetXaxis().GetXmax()
     n_bins_x = histo.GetNbinsX()
 
     if x_low is None:
-        x_low = x_low_tmp
+        # first set to lowest x-value
+        x_low = histo.GetXaxis().GetXmin()
         for i in range(1, n_bins_x + 1):
+            # start at bin 1 and find first bin with non-zero content
             if histo.GetBinContent(i) != 0:
                 x_low = histo.GetXaxis().GetBinLowEdge(i)
                 break
 
     if x_up is None:
-        x_up = x_up_tmp
+        # first set to highest x-value
+        x_up = histo.GetXaxis().GetXmax()
         for i in range(n_bins_x, 0, -1):
+            # start at last bin and find first bin with non-zero content
             if histo.GetBinContent(i) != 0:
                 x_up = histo.GetXaxis().GetBinUpEdge(i)
                 break
 
-    # Search within this range
+    # now found a particular x-range, search y values within this range
     start_bin = max(1, histo.GetXaxis().FindBin(x_low))
     end_bin = min(histo.GetNbinsX(), histo.GetXaxis().FindBin(x_up))
 
@@ -192,8 +200,12 @@ def find_boundaries_TGraph(graph, x_low=None, x_up=None, y_low=None, y_up=None):
 
     n_points = graph.GetN()
     if not n_points:
+        # if no points just return Nones
         return None, None, None, None
 
+    # set largest/lowest float values for those boundaries not defined by the user
+    # have to use temporary new variables here to overwrite potential user-defined
+    # boundaries in the following
     x_low_new = sys.float_info.max if x_low is None else x_low
     x_up_new = sys.float_info.min if x_up is None else x_up
     y_low_new = sys.float_info.max if y_low is None else y_low
@@ -202,6 +214,7 @@ def find_boundaries_TGraph(graph, x_low=None, x_up=None, y_low=None, y_up=None):
     for i in range(n_points):
         x_tmp = graph.GetPointX(i)
         y_tmp = graph.GetPointY(i)
+        # only do the actual search for each boundary if not defined by the user
         if x_low is None:
             x_low_new = min(x_low_new, x_tmp)
         elif x_tmp < x_low:
@@ -257,18 +270,25 @@ def find_boundaries(objects, x_low=None, x_up=None, y_low=None, y_up=None, x_log
         "Fix it by swapping numbers", y_low, y_up)
         y_low, y_up = (y_up, y_low)
 
+    # set largest/lowest float values
     x_low_new = sys.float_info.max
     x_up_new = sys.float_info.min
     y_low_new = sys.float_info.max
     y_up_new = sys.float_info.min
 
+    # set largest/lowest float values for a second search to find boundaries
+    # closest to object's contents
     x_low_new_no_user = sys.float_info.max
     x_up_new_no_user = sys.float_info.min
     y_low_new_no_user = sys.float_info.max
     y_up_new_no_user = sys.float_info.min
 
     for obj in objects:
-        # Works only for TH1
+        # for each 1D ROOT object find user and non-user-specific boundaries
+        if not is_1d(obj):
+            get_logger().warning("Cannot derive limits for object's class %s",
+                                 obj.__class__.__name__)
+            continue
         if isinstance(obj, ROOT_OBJECTS_HIST_1D):
             x_low_est, x_up_est, y_low_est, y_up_est = \
             find_boundaries_TH1(obj, x_low, x_up, y_low, y_up)
@@ -290,15 +310,17 @@ def find_boundaries(objects, x_low=None, x_up=None, y_low=None, y_up=None, x_log
             get_logger().warning("Finding boundaries for TEfficiency not yet implemented")
             continue
         else:
-            get_logger().warning("Cannot derive limits for object's class %s",
+            get_logger().warning("Unknown 1D class %s",
                                  obj.__class__.__name__)
             continue
 
+        # update boundaries for user-specific settings
         x_up_new = max(x_up_est, x_up_new)
         x_low_new = min(x_low_est, x_low_new)
         y_up_new = max(y_up_est, y_up_new)
         y_low_new = min(y_low_est, y_low_new)
 
+        # update boundaries for user-independent settings
         x_up_new_no_user = max(x_up_est_no_user, x_up_new_no_user)
         x_low_new_no_user = min(x_low_est_no_user, x_low_new_no_user)
         y_up_new_no_user = max(y_up_est_no_user, y_up_new_no_user)
@@ -306,37 +328,25 @@ def find_boundaries(objects, x_low=None, x_up=None, y_low=None, y_up=None, x_log
 
 
     if y_up_new < y_up_new_no_user and not y_force_limits:
+        # only do it if y-limits are not forced
         get_logger().warning("The upper y-limit was chosen to be %f which is however too small " \
         "to fit the plots. It is adjusted to the least maximum value of %f.",
         y_up_new, y_up_new_no_user)
-        # Enlarge is
+
         y_up_new = y_up_new_no_user
+
     if y_low_new > y_low_new_no_user and not y_force_limits:
+        # only do it if y-limits are not forced
         get_logger().warning("The lower y-limit was chosen to be %f which is however too large " \
         "to fit the plots. It is adjusted to the least maximum value of %f.",
         y_low_new, y_low_new_no_user)
-        # Enlarge is
+
         y_low_new = y_low_new_no_user
 
-    # Now we know that the user y-limit is at least as big as the no-user limit
 
-    # compute what we need for the legend
-    if reserve_ndc_top and not y_force_limits:
-        y_diff = y_up_new - y_low_new
-        y_diff_user_no_user = y_up_new - y_up_new_no_user
-        reserve_prop = y_diff * reserve_ndc_top
-        if reserve_prop > y_diff_user_no_user:
-            get_logger().info("Add space to fit legend")
-            y_up_new = y_up_new + reserve_prop
 
-    if y_low_new <= 0 and y_log:
-        # If still not compatible with log scale, force it.
-        # Can happen if fixed by user and at the same time log scale is desired
-        get_logger().warning("Have to set y-minimum to something larger than 0 since log-scale " \
-        "is requested. Set value was %d and reset value is now %d", y_low_new, MIN_LOG_SCALE)
-        y_low_new = MIN_LOG_SCALE
 
-    # Adjust a bit top and bottom
+    # Adjust a bit top and bottom otherwise maxima and minima will exactly touch the x-axis
     y_diff = y_up_new - y_low_new
     y_divide = y_up_new / y_low_new
     if y_low is None:
@@ -355,13 +365,22 @@ def find_boundaries(objects, x_low=None, x_up=None, y_low=None, y_up=None, x_log
         y_low_new = y_low
         y_up_new = y_up
 
+
+    if y_low_new <= 0 and y_log:
+        # If not compatible with log scale, force it to be
+        # Can happen if fixed by user - but incompatible -
+        # and at the same time log scale is requested
+        get_logger().warning("Have to set y-minimum to something larger than 0 since log-scale " \
+        "is requested. Set value was %d and reset value is now %d", y_low_new, MIN_LOG_SCALE)
+        y_low_new = MIN_LOG_SCALE
+
+    # compute what we need for the legend
+    if reserve_ndc_top and not y_force_limits:
+        y_diff = y_up_new - y_low_new
+        y_diff_up_user_no_user = y_up_new - y_up_new_no_user
+        if y_diff_up_user_no_user / y_diff < reserve_ndc_top:
+            y_diff_with_legend = y_diff / (1 - reserve_ndc_top)
+            get_logger().info("Add space to fit legend")
+            y_up_new = y_low_new + y_diff_with_legend + 0.1 * y_diff
+
     return x_low_new, x_up_new, y_low_new, y_up_new
-
-
-def is_1d(root_object):
-    """Test whether a ROOT object is 1D histogram-like
-    """
-    if isinstance(root_object, ROOT_OBJECTS_1D) \
-    and not isinstance(root_object, ROOT_OBJECTS_NOT_1D):
-        return True
-    return False

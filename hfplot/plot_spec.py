@@ -5,6 +5,15 @@ from hfplot.logger import get_logger, configure_logger
 
 configure_logger(True)
 
+class TextSpec:
+    """Text specification
+    """
+    def __init__(self, text, x_low, y_low, size):
+        self.text = text
+        self.x_low = x_low
+        self.y_low = y_low
+        self.size = size
+
 
 class AxisSpec: # pylint: disable=too-many-instance-attributes, too-few-public-methods
     """Axis specification
@@ -37,6 +46,9 @@ class PlotSpec: # pylint: disable=too-few-public-methods
         # Tuple of column margins [0] = left, [1] = right
         self._column_margins = None
 
+        # text to be added to a plot
+        self._texts = None
+
         # AxisSpecs of the PlotSpec
         self.axes = [AxisSpec(), AxisSpec(), AxisSpec()]
 
@@ -55,6 +67,20 @@ class PlotSpec: # pylint: disable=too-few-public-methods
         self._rel_coordinates = orig._rel_coordinates # pylint: disable=protected-access
         self._row_margins = orig._row_margins # pylint: disable=protected-access
         self._column_margins = orig._column_margins # pylint: disable=protected-access
+        self._texts = orig._texts # pylint: disable=protected-access
+
+    def add_text(self, text, x_low, y_low, size=0.04):
+        """Add a text to be added to this plot
+
+        Args:
+            text: str to be printed
+            x_low: relative low horizontal coordinate
+            y_low: relative vertical coordinate
+        """
+        if self._texts is None:
+            self._texts = []
+
+        self._texts.append(TextSpec(text, x_low, y_low, size))
 
 
 class FigureSpec: # pylint: disable=too-many-instance-attributes
@@ -364,3 +390,18 @@ class FigureSpec: # pylint: disable=too-many-instance-attributes
             f"{len(self._plot_specs)} plots are defined.")
         self._current_plot_spec = self._plot_specs[plot_id]
         return self._current_plot_spec
+
+
+    def add_text(self, text, x_low, y_low, size=0.02):
+        """Add a text to be added to the current plot
+
+        Args:
+            text: str to be printed
+            x_low: relative low horizontal coordinate
+            y_low: relative vertical coordinate
+            size: float relative text size
+        """
+        if not self._current_plot_spec:
+            self.logger.warning("No current plot to add text")
+            return
+        self._current_plot_spec.add_text(text, x_low, y_low, size)
