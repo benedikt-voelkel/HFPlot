@@ -2,11 +2,22 @@
 """
 
 from hfplot.plot_spec_root import ROOTFigure
-from hfplot.style import generate_styles
 
 
 def make_grid(n_cols_rows, margin_left, margin_bottom, margin_right=0.05,
               margin_top=0.05, figure_class=ROOTFigure, **kwargs):
+    """helper tp make a grid with shared x- and y-axes
+
+    Args:
+        n_cols_rows: int or 2-tuple of int specifying number of columns and rows
+        margin_left: float for relative left margin of FigureSpec
+        margin_bottom: float for relative bottom margin of FigureSpec
+        margin_right: float for relative right margin of FigureSpec
+        margin_top: float for relative top margin of FigureSpec
+        figure_class: (derived) FigureSpec class to use for construction
+        kwargs: dict
+            size: 2-tuple specifying pixel size (width, height) of figure
+    """
 
 
     size = kwargs.pop("size", (600, 600))

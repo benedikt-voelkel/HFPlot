@@ -2,12 +2,13 @@
 """
 
 from hfplot.logger import get_logger, configure_logger
-from hfplot.style import generate_styles
 
 configure_logger(True)
 
 
-class AxisSpec:
+class AxisSpec: # pylint: disable=too-many-instance-attributes, too-few-public-methods
+    """Axis specification
+    """
     def __init__(self):
         self.limits = [None, None]
         self.title = ""
@@ -19,7 +20,9 @@ class AxisSpec:
         self.is_log = False
 
 
-class PlotSpec:
+class PlotSpec: # pylint: disable=too-few-public-methods
+    """Generic plot specification
+    """
     def __init__(self):
 
         # The parent FigureSpec this PlotSpec is embedded in
@@ -48,13 +51,13 @@ class PlotSpec:
         """
         if orig is None:
             return
-        self._parent_figure_spec = orig._parent_figure_spec
-        self._rel_coordinates = orig._rel_coordinates
-        self._row_margins = orig._row_margins
-        self._column_margins = orig._column_margins
+        self._parent_figure_spec = orig._parent_figure_spec # pylint: disable=protected-access
+        self._rel_coordinates = orig._rel_coordinates # pylint: disable=protected-access
+        self._row_margins = orig._row_margins # pylint: disable=protected-access
+        self._column_margins = orig._column_margins # pylint: disable=protected-access
 
 
-class FigureSpec:
+class FigureSpec: # pylint: disable=too-many-instance-attributes
     """Specification of the overall figure
     (which people might call TCanvas in ROOT or Figure in matplotlib)
 
@@ -73,8 +76,8 @@ class FigureSpec:
     def __init__(self, n_cols, n_rows, height_ratios=None, width_ratios=None, **kwargs):
 
         # construct unique name
-        self.name = f"{self.FIGURE_NAME_BASE}_{self.N_FIGURES}"
-        self.N_FIGURES += 1
+        self.name = f"{FigureSpec.FIGURE_NAME_BASE}_{FigureSpec.N_FIGURES}"
+        FigureSpec.N_FIGURES += 1
 
         # Size in pixels (width, height)
         self.size = kwargs.pop("size", (300, 300))
@@ -113,7 +116,7 @@ class FigureSpec:
         if ratios is None:
             self._height_ratios = [1] * self.n_rows
             return
-        elif len(ratios) != self.n_rows:
+        if len(ratios) != self.n_rows:
             raise ValueError(f"Expecting number of ratios ({len(ratios)}) " \
             f"to be the same as number of rows ({self.n_rows})")
         self._height_ratios = ratios
@@ -128,7 +131,7 @@ class FigureSpec:
         if ratios is None:
             self._width_ratios = [1] * self.n_cols
             return
-        elif len(ratios) != self.n_cols:
+        if len(ratios) != self.n_cols:
             raise ValueError(f"Expecting number of ratios ({len(ratios)}) " \
             f"to be the same as number of rows ({self.n_cols})")
         self._width_ratios = ratios
@@ -149,10 +152,11 @@ class FigureSpec:
 
         try:
             iter(margins[0])
-        except TypeError:
+        except TypeError as type_error:
             # This seems to be one single iterable object
             if len(margins) != 2:
-                raise ValueError("Need tuple/list with 2 entries for top and bottom margin")
+                raise ValueError("Need tuple/list with 2 entries for top and bottom margin") \
+                from type_error
             self._row_margins = [margins] * self.n_rows
             return
 
@@ -181,10 +185,11 @@ class FigureSpec:
 
         try:
             iter(margins[0])
-        except TypeError:
+        except TypeError as type_error:
             # This seems to be one single iterable object
             if len(margins) != 2:
-                raise ValueError("Need tuple/list with 2 entries for left and right margin")
+                raise ValueError("Need tuple/list with 2 entries for left and right margin") \
+                from type_error
             self._column_margins = [margins] * self.n_cols
             return
 
@@ -276,11 +281,11 @@ class FigureSpec:
 
         # Make a new PlotSpec and set its properties
         plot_spec = PlotSpec()
-        plot_spec._parent_figure_spec = self
-        plot_spec._rel_coordinates = (rel_left, rel_bottom, rel_right, rel_top)
-        plot_spec._column_margins = (self._column_margins[col_low][0],
+        plot_spec._parent_figure_spec = self # pylint: disable=protected-access
+        plot_spec._rel_coordinates = (rel_left, rel_bottom, rel_right, rel_top) # pylint: disable=protected-access
+        plot_spec._column_margins = (self._column_margins[col_low][0], # pylint: disable=protected-access
                                      self._column_margins[col_up][1])
-        plot_spec._row_margins = (self._row_margins[row_low][0], self._row_margins[row_up][1])
+        plot_spec._row_margins = (self._row_margins[row_low][0], self._row_margins[row_up][1]) # pylint: disable=protected-access
         return plot_spec
 
 
@@ -333,7 +338,7 @@ class FigureSpec:
         # Now compute the cell numbers which are taken by this definition. Do
         # it directly here since the following add_plot_spec might be derived
         # and it shouldn't be the user who has to take care of that
-        self.__compute_cells(row_low, col_low, row_up, col_up)
+        self.__compute_cells(col_low, row_low, col_up, row_up)
 
         # Make a PlotSpec
         self.add_plot_spec(self.__make_plot_spec(col_low, row_low, col_up, row_up))
@@ -342,8 +347,8 @@ class FigureSpec:
         self._current_plot_spec = self._plot_specs[-1]
 
         # might be have shared x- or y-axes
-        self._current_plot_spec._share_x = share_x
-        self._current_plot_spec._share_y = share_y
+        self._current_plot_spec._share_x = share_x # pylint: disable=protected-access
+        self._current_plot_spec._share_y = share_y # pylint: disable=protected-access
 
         return self._current_plot_spec
 

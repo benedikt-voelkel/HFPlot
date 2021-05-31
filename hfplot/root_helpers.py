@@ -1,7 +1,10 @@
+"""ROOT helper utilities
+"""
+
 import sys
 
-from ROOT import TH1C, TH1S, TH1I, TH1F, TH1D, TEfficiency, TGraph, TF1, TF12, TF2, TF3
-from ROOT import gROOT
+from ROOT import TH1C, TH1S, TH1I, TH1F, TH1D, TEfficiency, TGraph, TF1, TF12, TF2, TF3 # pylint: disable=no-name-in-module
+from ROOT import Double # pylint: disable=no-name-in-module
 
 from hfplot.logger import get_logger
 
@@ -9,16 +12,21 @@ MIN_LOG_SCALE = 0.00000000001
 
 ROOT_OBJECTS_1D = (TH1C, TH1S, TH1I, TH1F, TH1D, TEfficiency, TGraph, TF1, TF12)
 ROOT_OBJECTS_HIST_1D = (TH1C, TH1S, TH1I, TH1F, TH1D)
-# Need to exclude since they are derived from TF1
+# Need to exclude in case of 1D since they are derived from TF1
 ROOT_OBJECTS_NOT_1D = (TF2, TF3)
 
 
-
 class ROOTObjectStore:
+    """Replay a singleton-like ROOT object store
+
+    For now only used to generate unique names of objects
+    """
     __instance = None
 
     @staticmethod
     def get_instance():
+        """retrieve the instance and create it in case not existing yet
+        """
         if ROOTObjectStore.__instance is None:
             ROOTObjectStore()
 
@@ -28,8 +36,18 @@ class ROOTObjectStore:
         self._name_count = {}
         ROOTObjectStore.__instance = self
 
-    def create_name(self, object, proposed_name=None):
-        name = proposed_name if proposed_name else object.GetName()
+    def create_name(self, root_object, proposed_name=None):
+        """Create a unique name
+
+        Args:
+            root_object: anything deriving from TNamed
+            proposed_name: str or None, propose a name to be set
+
+        Returns:
+            str: new possible name for root_object
+        """
+
+        name = proposed_name if proposed_name else root_object.GetName()
         if name not in self._name_count:
             self._name_count[name] = 0
         else:
@@ -38,21 +56,51 @@ class ROOTObjectStore:
 
 
 def get_root_object_store():
+    """Retrieve global instance of ROOTObjectStore
+    """
     return ROOTObjectStore.get_instance()
 
 
-def clone_root(object, suffix="clone", name=None):
-    name = get_root_object_store().create_name(object, name)
-    obj = object.Clone(name)
+def detach_from_root_directory(root_object):
+    """Detatch ROOT object from potential TDirectory
+    """
+    if hasattr(root_object, "SetDirectory"):
+        root_object.SetDirectory(0)
+
+
+def clone_root(root_object, proposed_name=None, detach=True):
+    """Safely clone a ROOT object with new name
+
+    Args:
+        root_object: any object deriving from TNamed
+        proposed_name: str or None, propose a name to be set
+        detach: bool whether or not to detach the cloned object from a potential
+                owning TDirectory
+
+    Returns:
+        cloned ROOT object
+    """
+    proposed_name = get_root_object_store().create_name(root_object, proposed_name)
+    obj = root_object.Clone(proposed_name)
+    if detach:
+        detach_from_root_directory(obj)
     return obj
 
 
-def detach_from_root_file(object):
-    if hasattr(object, "SetDirectory"):
-        object.SetDirectory(0)
+def find_boundaries_TH1(histo, x_low=None, x_up=None, y_low=None, y_up=None): # pylint: disable=unused-argument, invalid-name
+    """find the x- and y-axes boundaries specifically for 1D TH1
 
+    Args:
+        histo: TH1 1D histogram to derive boundaries for
+        x_low: float or None (fix to given float if given) otherwise derive from histogram
+        x_up: float or None (fix to given float if given) otherwise derive from histogram
+        y_low: float or None (fix to given float if given) otherwise derive from histogram
+        y_up: float or None (fix to given float if given) otherwise derive from histogram
 
-def find_boundaries_TH1(histo, x_low=None, x_up=None, y_low=None, y_up=None, x_log=False):
+    Returns:
+        float, float, float, float (derived boundaries)
+    """
+
     # TODO Quite some code duplication. Fix that
 
     # To restore x-range
@@ -95,7 +143,19 @@ def find_boundaries_TH1(histo, x_low=None, x_up=None, y_low=None, y_up=None, x_l
     return x_low, x_up, y_low, y_up
 
 
-def find_boundaries_TF1(func, x_low=None, x_up=None, y_low=None, y_up=None):
+def find_boundaries_TF1(func, x_low=None, x_up=None, y_low=None, y_up=None): # pylint: disable=invalid-name
+    """find the x- and y-axes boundaries specifically for 1D TF1
+
+    Args:
+        histo: TH1 1D histogram to derive boundaries for
+        x_low: float or None (fix to given float if given) otherwise derive from histogram
+        x_up: float or None (fix to given float if given) otherwise derive from histogram
+        y_low: float or None (fix to given float if given) otherwise derive from histogram
+        y_up: float or None (fix to given float if given) otherwise derive from histogram
+
+    Returns:
+        float, float, float, float (derived boundaries)
+    """
 
     x_low_double = Double()
     x_up_double = Double()
@@ -116,7 +176,19 @@ def find_boundaries_TF1(func, x_low=None, x_up=None, y_low=None, y_up=None):
     return x_low, x_up, y_low, y_up
 
 
-def find_boundaries_TGraph(graph, x_low=None, x_up=None, y_low=None, y_up=None):
+def find_boundaries_TGraph(graph, x_low=None, x_up=None, y_low=None, y_up=None): # pylint: disable=invalid-name
+    """find the x- and y-axes boundaries specifically for 1D TGraph
+
+    Args:
+        histo: TH1 1D histogram to derive boundaries for
+        x_low: float or None (fix to given float if given) otherwise derive from histogram
+        x_up: float or None (fix to given float if given) otherwise derive from histogram
+        y_low: float or None (fix to given float if given) otherwise derive from histogram
+        y_up: float or None (fix to given float if given) otherwise derive from histogram
+
+    Returns:
+        float, float, float, float (derived boundaries)
+    """
 
     n_points = graph.GetN()
     if not n_points:
@@ -148,23 +220,42 @@ def find_boundaries_TGraph(graph, x_low=None, x_up=None, y_low=None, y_up=None):
     return x_low_new, x_up_new, y_low_new, y_up_new
 
 
-def find_boundaries(objects, x_low=None, x_up=None, y_low=None, y_up=None, x_log=False, y_log=False, reserve_ndc_top=None, y_force_limits=False):
+def find_boundaries(objects, x_low=None, x_up=None, y_low=None, y_up=None, x_log=False, # pylint: disable=unused-argument, too-many-branches, too-many-statements
+                    y_log=False, reserve_ndc_top=None, y_force_limits=False):
     """Find boundaries for any ROOT objects
+
+    Args:
+        histo: TH1 1D histogram to derive boundaries for
+        x_low: float or None (fix to given float if given) otherwise derive from histogram
+        x_up: float or None (fix to given float if given) otherwise derive from histogram
+        y_low: float or None (fix to given float if given) otherwise derive from histogram
+        y_up: float or None (fix to given float if given) otherwise derive from histogram
+        x_log: bool whether or not x-axis is log scale
+        y_log: bool whether or not y-axis is log scale
+        reserve_ndc_top: float or None, specify whether or not some space should be reserved
+                         for the legend
+        y_force_limits: bool to really force the limits as set by the user regardless of having a
+                        potential overlapping legend
+    Returns:
+        float, float, float, float (derived boundaries)
+
     """
 
+    #TODO This has to be revised (code duplication, ~brute force implementation)
+
     if x_up is not None and x_low is not None and x_up < x_low:
-        # At this point there are numbers for sure. If specified by the user and in case wrong way round, fix it
-        get_logger().warning("Minimum (%f) is larger than maximum (%f) on x-axis. Fix it by swapping numbers", x_low, x_up)
-        x_tmp = x_up
-        x_up = x_low
-        x_low = x_tmp
+        # At this point there are numbers for sure.
+        # If specified by the user and in case wrong way round, fix it
+        get_logger().warning("Minimum (%f) is larger than maximum (%f) on x-axis. " \
+        "Fix it by swapping numbers", x_low, x_up)
+        x_low, x_up = (x_up, x_low)
 
     if y_up is not None and y_low is not None and y_up < y_low:
-        # At this point there are numbers for sure. If specified by the user and in case wrong way round, fix it
-        get_logger().warning("Minimum (%f) is larger than maximum (%f) on y-axis. Fix it by swapping numbers", y_low, y_up)
-        y_tmp = y_up
-        y_up = y_low
-        y_low = y_tmp
+        # At this point there are numbers for sure.
+        # If specified by the user and in case wrong way round, fix it
+        get_logger().warning("Minimum (%f) is larger than maximum (%f) on y-axis. " \
+        "Fix it by swapping numbers", y_low, y_up)
+        y_low, y_up = (y_up, y_low)
 
     x_low_new = sys.float_info.max
     x_up_new = sys.float_info.min
@@ -179,23 +270,28 @@ def find_boundaries(objects, x_low=None, x_up=None, y_low=None, y_up=None, x_log
     for obj in objects:
         # Works only for TH1
         if isinstance(obj, ROOT_OBJECTS_HIST_1D):
-            x_low_est, x_up_est, y_low_est, y_up_est = find_boundaries_TH1(obj, x_low, x_up, y_low, y_up)
-            x_low_est_no_user, x_up_est_no_user, y_low_est_no_user, y_up_est_no_user = find_boundaries_TH1(obj)
+            x_low_est, x_up_est, y_low_est, y_up_est = \
+            find_boundaries_TH1(obj, x_low, x_up, y_low, y_up)
+            x_low_est_no_user, x_up_est_no_user, y_low_est_no_user, y_up_est_no_user = \
+            find_boundaries_TH1(obj)
         elif isinstance(obj, TF1) and not isinstance(obj, ROOT_OBJECTS_NOT_1D):
-            x_low_est, x_up_est, y_low_est, y_up_est = find_boundaries_TF1(obj, x_low, x_up, y_low, y_up)
-            x_low_est_no_user, x_up_est_no_user, y_low_est_no_user, y_up_est_no_user = find_boundaries_TF1(obj)
+            x_low_est, x_up_est, y_low_est, y_up_est = \
+            find_boundaries_TF1(obj, x_low, x_up, y_low, y_up)
+            x_low_est_no_user, x_up_est_no_user, y_low_est_no_user, y_up_est_no_user = \
+            find_boundaries_TF1(obj)
         elif isinstance(obj, TGraph):
-            x_low_est, x_up_est, y_low_est, y_up_est = find_boundaries_TGraph(obj, x_low, x_up, y_low, y_up)
+            x_low_est, x_up_est, y_low_est, y_up_est = \
+            find_boundaries_TGraph(obj, x_low, x_up, y_low, y_up)
             if x_low_est is None:
                 continue
-            x_low_est_no_user, x_up_est_no_user, y_low_est_no_user, y_up_est_no_user = find_boundaries_TGraph(obj)
+            x_low_est_no_user, x_up_est_no_user, y_low_est_no_user, y_up_est_no_user = \
+            find_boundaries_TGraph(obj)
         elif isinstance(obj, TEfficiency):
             get_logger().warning("Finding boundaries for TEfficiency not yet implemented")
             continue
-            #x_low_est, x_up_est, y_low_est, y_up_est = find_boundaries_TEfficiency(obj, x_low, x_up, y_low, y_up)
-            #x_low_est_no_user, x_up_est_no_user, y_low_est_no_user, y_up_est_no_user = find_boundaries_TEfficiency(obj)
         else:
-            get_logger().warning("Cannot derive limits for object's class %s", obj.__class__.__name__)
+            get_logger().warning("Cannot derive limits for object's class %s",
+                                 obj.__class__.__name__)
             continue
 
         x_up_new = max(x_up_est, x_up_new)
@@ -210,11 +306,15 @@ def find_boundaries(objects, x_low=None, x_up=None, y_low=None, y_up=None, x_log
 
 
     if y_up_new < y_up_new_no_user and not y_force_limits:
-        get_logger().warning("The upper y-limit was chosen to be %f which is however too small to fit the plots. It is adjusted to the least maximum value of %f.", y_up_new, y_up_new_no_user)
+        get_logger().warning("The upper y-limit was chosen to be %f which is however too small " \
+        "to fit the plots. It is adjusted to the least maximum value of %f.",
+        y_up_new, y_up_new_no_user)
         # Enlarge is
         y_up_new = y_up_new_no_user
     if y_low_new > y_low_new_no_user and not y_force_limits:
-        get_logger().warning("The lower y-limit was chosen to be %f which is however too large to fit the plots. It is adjusted to the least maximum value of %f.", y_low_new, y_low_new_no_user)
+        get_logger().warning("The lower y-limit was chosen to be %f which is however too large " \
+        "to fit the plots. It is adjusted to the least maximum value of %f.",
+        y_low_new, y_low_new_no_user)
         # Enlarge is
         y_low_new = y_low_new_no_user
 
@@ -230,8 +330,10 @@ def find_boundaries(objects, x_low=None, x_up=None, y_low=None, y_up=None, x_log
             y_up_new = y_up_new + reserve_prop
 
     if y_low_new <= 0 and y_log:
-        # If still not compatible with log scale, force it. Can happen if fixed by user and at the same time log scale is desired
-        get_logger().warning("Have to set y-minimum to something larger than 0 since log-scale is desired. Desired value was %d and reset value is now %d", y_low_new, MIN_LOG_SCALE)
+        # If still not compatible with log scale, force it.
+        # Can happen if fixed by user and at the same time log scale is desired
+        get_logger().warning("Have to set y-minimum to something larger than 0 since log-scale " \
+        "is requested. Set value was %d and reset value is now %d", y_low_new, MIN_LOG_SCALE)
         y_low_new = MIN_LOG_SCALE
 
     # Adjust a bit top and bottom
@@ -256,15 +358,10 @@ def find_boundaries(objects, x_low=None, x_up=None, y_low=None, y_up=None, x_log
     return x_low_new, x_up_new, y_low_new, y_up_new
 
 
-def is_1d(obj):
-    if isinstance(obj, ROOT_OBJECTS_1D) and not isinstance(obj, ROOT_OBJECTS_NOT_1D):
+def is_1d(root_object):
+    """Test whether a ROOT object is 1D histogram-like
+    """
+    if isinstance(root_object, ROOT_OBJECTS_1D) \
+    and not isinstance(root_object, ROOT_OBJECTS_NOT_1D):
         return True
     return False
-
-
-def map_value(old_value, old_min, old_max, new_min, new_max):
-    """helper to map value to new interval (default [0, 1])
-    """
-    if old_min == old_max:
-        return (new_max - new_min) / 2.
-    return (((old_value - old_min) * (new_max - new_min)) / (old_max - old_min)) + new_min

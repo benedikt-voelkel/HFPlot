@@ -1,6 +1,11 @@
+"""Style handling
+"""
+
 from copy import copy
 
-from ROOT import kCyan, kPink, kRed, kBlue, kTeal, kYellow, kOrange
+from ROOT import kCyan, kPink, kBlue, kTeal, kYellow, kOrange # pylint: disable=no-name-in-module
+
+from hfplot.logger import get_logger
 
 COLOR_DEFAULTS = [kCyan - 1, kPink - 6, kBlue + 2, kTeal + 3, kYellow + 3, kOrange + 8]
 
@@ -21,7 +26,11 @@ FILLCOLOR_DEFAULTS = copy(COLOR_DEFAULTS)
 FILLALPHA_DEFAULTS = [1]
 
 
-class ROOTStyle1D:
+class ROOTStyle1D: # pylint: disable=too-many-instance-attributes, too-few-public-methods
+    """Summarising style attributes for 1D ROOT objects
+
+    TODO This needs to be revised at some point
+    """
     def __init__(self):
         self.linewidth = None
         self.linestyle = None
@@ -40,6 +49,9 @@ class ROOTStyle1D:
 
     @property
     def fillstyle(self):
+        """intervene to set a number in case the fillstyle is specified as a
+        string
+        """
         return self._fillstyle
     @fillstyle.setter
     def fillstyle(self, value):
@@ -51,10 +63,15 @@ class ROOTStyle1D:
         self._fillstyle = value
 
 def generate_styles_1d(n_styles, **kwargs):
-    # 1-dimensional object
+    """generate styles for 1D ROOT objects
+
+    Args:
+        n_styles: int number of styles to be generated
+        kwargs: dict used to fix certain attributes by the user
+    """
 
     styles = []
-    
+
     linewidths = kwargs.pop("linewidths", LINEWIDTH_DEFAULTS)
     linestyles = kwargs.pop("linestyles", LINESTYLE_DEFAULTS)
     linecolors = kwargs.pop("linecolors", LINECOLOR_DEFAULTS)
@@ -83,6 +100,13 @@ def generate_styles_1d(n_styles, **kwargs):
 
 
 def generate_styles(n_styles, **kwargs):
+    """generate styles for 1D ROOT objects
+
+    Args:
+        n_styles: int number of styles to be generated
+        kwargs: dict used to fix certain attributes by the user
+    """
+
     dim = kwargs.pop("dim", 1)
 
     if dim == 1:

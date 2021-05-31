@@ -1,4 +1,5 @@
-
+"""Generic utilities
+"""
 
 def map_value(old_value, old_min, old_max, new_min, new_max):
     """helper to map value from one interval to new interval
