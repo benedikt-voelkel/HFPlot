@@ -1,20 +1,34 @@
-from ROOT import TFile
+from array import array
+from os import getpid
 
-from hfplot.plot import ROOTFigure, make_equal_grid
-from hfplot.style import generate_styles
+from ROOT import TRandom, TH1F
 
-file_name = "/path/to/rootfile"
-hist_name = "histName"
+from hfplot.plot_helpers import make_grid
+from hfplot.style import generate_styles, ROOTStyle1D
+from hfplot.plot_spec_root import ROOTFigure
 
-file_1 = TFile(file_name, "READ")
-hist_1 = file_1.Get(hist_name)
 
-file_name = "/path/to/rootfile"
-hist_name = "histName"
+##########################################
+# first define some objects to play with #
+##########################################
 
-file_2 = TFile(file_name, "READ")
-hist_2 = file_2.Get(hist_name)
+random = TRandom(getpid())
 
+# Create a histogram to play with
+bin_edges = array("d", [2, 3, 5, 7, 11, 13, 17, 19])
+hist_1 = TH1F("some_histogram_1", "", len(bin_edges) - 1, bin_edges)
+hist_2 = TH1F("some_histogram_2", "", len(bin_edges) - 1, bin_edges)
+# Fill histogram from a random number generation
+for i in range(len(bin_edges) - 1):
+    hist_1.SetBinContent(i + 1, random.Poisson(42))
+    hist_1.SetBinError(i + 1, random.Gaus(10))
+    hist_2.SetBinContent(i + 1, random.Poisson(42))
+    hist_2.SetBinError(i + 1, random.Gaus(10))
+
+
+###################################
+# The actual plotting starts here #
+###################################
 
 # Generate 5 styles, keep markerstyle the same for all
 styles = generate_styles(5, markerstyles=[34])
@@ -46,10 +60,13 @@ figure.add_object(hist_1, style=styles[2], label="MyLabel5")
 # now add another plot and we want to share the x-axis again
 figure.define_plot(0, 2, 0, 3, share_x=plot3)
 figure.add_object(hist_1, style=styles[2], label="MyLabel6")
-#
-# # now add another plot and we want to share the x-axis again
-# figure.define_plot(1, 3)
-# figure.add_object(histo_1, style=styles[2], label="MyLabel7")
+
+plot4 = figure.define_plot(1, 3)
+figure.add_object(hist_1, style=styles[2], label="MyLabel7")
+
+figure.define_plot(2, 3, share_y=plot4)
+figure.add_object(hist_1, style=styles[3], label="MyLabel8")
+figure.add_object(hist_2, style=styles[4], label="MyLabel9")
 
 # until now, nothing actually happened, the above is really only a specification
 # only with this call things are actually created and drawn

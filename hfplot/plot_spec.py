@@ -5,7 +5,7 @@ from hfplot.logger import get_logger, configure_logger
 
 configure_logger(True)
 
-class TextSpec:
+class TextSpec: # pylint: disable=too-few-public-methods
     """Text specification
     """
     def __init__(self, text, x_low, y_low, size):
@@ -131,6 +131,10 @@ class FigureSpec: # pylint: disable=too-many-instance-attributes
 
         # quickly refer to logger
         self.logger = get_logger()
+
+        # automatically define a plot if only one cell
+        if self.n_cols == 1 and self.n_rows == 1:
+            self.define_plot(0,0)
 
 
     def __make_height_ratios(self, ratios):
@@ -379,12 +383,17 @@ class FigureSpec: # pylint: disable=too-many-instance-attributes
         return self._current_plot_spec
 
 
-    def change_plot(self, plot_id):
+    def change_plot(self, plot_id=-1):
         """Set the current PlotSpec from its ID
 
         Args:
             plot_id: int being the PlotSpec's ID
         """
+        if plot_id < 0:
+            if self._current_plot_spec:
+                return self._current_plot_spec
+            raise ValueError("No current plot yet, nothing was defined.")
+
         if len(self._plot_specs) <= plot_id:
             raise ValueError(f"Attempt to change to plot {plot_id} but only " \
             f"{len(self._plot_specs)} plots are defined.")

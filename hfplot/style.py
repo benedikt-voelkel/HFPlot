@@ -25,6 +25,8 @@ FILLSTYLE_DEFAULTS = [FILLSTYLES_DICT["empty"]]
 FILLCOLOR_DEFAULTS = copy(COLOR_DEFAULTS)
 FILLALPHA_DEFAULTS = [1]
 
+DRAW_OPTIONS_DEFAULTS = [""]
+
 
 class ROOTStyle1D: # pylint: disable=too-many-instance-attributes, too-few-public-methods
     """Summarising style attributes for 1D ROOT objects
@@ -84,6 +86,8 @@ def generate_styles_1d(n_styles, **kwargs):
     fillcolors = kwargs.pop("fillcolors", FILLCOLOR_DEFAULTS)
     fillalphas = kwargs.pop("fillalpha", FILLALPHA_DEFAULTS)
 
+    draw_options = kwargs.pop("draw_options", DRAW_OPTIONS_DEFAULTS)
+
     for i in range(n_styles):
         new_style = ROOTStyle1D()
         new_style.linewidth = linewidths[i % len(linewidths)]
@@ -95,6 +99,7 @@ def generate_styles_1d(n_styles, **kwargs):
         new_style.fillstyle = fillstyles[i % len(fillstyles)]
         new_style.fillcolor = fillcolors[i % len(fillcolors)]
         new_style.fillalpha = fillalphas[i % len(fillalphas)]
+        new_style.draw_options = draw_options[i % len(draw_options)]
         styles.append(new_style)
     return styles
 
@@ -111,5 +116,5 @@ def generate_styles(n_styles, **kwargs):
 
     if dim == 1:
         return generate_styles_1d(n_styles, **kwargs)
-    get_logger().warning("Style are only supported for 1d and 2d objects")
+    get_logger().warning("Styles are only supported for 1d and 2d objects")
     return [None] * n_styles

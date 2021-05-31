@@ -9,7 +9,7 @@ from ROOT import gROOT, gDirectory, gPad, TDirectory # pylint: disable=no-name-i
 from hfplot.plot_spec import FigureSpec, PlotSpec
 
 from hfplot.root_helpers import clone_root, find_boundaries
-from hfplot.utilities import map_value
+from hfplot.utilities import map_value, try_method
 
 gROOT.SetBatch()
 
@@ -95,15 +95,23 @@ class ROOTPlot(PlotSpec): # pylint: disable=too-many-instance-attributes
             return
         # call one style method of the object after the other
         # TODO might need to be specific for certain ROOT classes
-        obj.SetLineWidth(style.linewidth)
-        obj.SetLineStyle(style.linestyle)
-        obj.SetLineColor(style.linecolor)
-        obj.SetMarkerSize(style.markersize * scale)
-        obj.SetMarkerStyle(style.markerstyle)
-        obj.SetMarkerColor(style.markercolor)
-        obj.SetFillStyle(style.fillstyle)
-        obj.SetFillColor(style.fillcolor)
-        if style.fillalpha < 1.:
+        if style.linewidth is not None:
+            obj.SetLineWidth(style.linewidth)
+        if style.linestyle is not None:
+            obj.SetLineStyle(style.linestyle)
+        if style.linecolor is not None:
+            obj.SetLineColor(style.linecolor)
+        if style.markersize is not None:
+            obj.SetMarkerSize(style.markersize * scale)
+        if style.markerstyle is not None:
+            obj.SetMarkerStyle(style.markerstyle)
+        if style.markercolor is not None:
+            obj.SetMarkerColor(style.markercolor)
+        if style.fillstyle is not None:
+            obj.SetFillStyle(style.fillstyle)
+        if style.fillcolor is not None:
+            obj.SetFillColor(style.fillcolor)
+        if style.fillalpha is not None and style.fillcolor is not None and style.fillalpha < 1.:
             obj.SetFillColorAlpha(style.fillcolor, style.fillalpha)
 
     def __style_objects(self, **kwargs):
@@ -119,7 +127,7 @@ class ROOTPlot(PlotSpec): # pylint: disable=too-many-instance-attributes
         for obj, style in zip(self.objects, self.styles):
             self.__style_object(obj, style, scale)
             if not keep_stats:
-                obj.SetStats(0)
+                try_method(obj, "SetStats", 0)
 
 
     def add_object(self, root_object, style=None, label=None):
@@ -201,8 +209,6 @@ class ROOTPlot(PlotSpec): # pylint: disable=too-many-instance-attributes
         self.axes[0].limits[1] = x_up
         self.axes[1].limits[0] = y_low
         self.axes[1].limits[1] = y_up
-
-        print(y_low, y_up)
 
         # Give the frame a unique name, for now just because we do it for
         # ROOT related object
@@ -302,12 +308,14 @@ class ROOTPlot(PlotSpec): # pylint: disable=too-many-instance-attributes
         n_labels = int(n_labels / self._legend_n_columns)
 
         # Get the same legend positioning relative to the axes in the plot
-        x_low, y_low, x_up, y_up = self.__adjust_legend_coordinates(0.5, 0.7, 0.89, 0.89)
-        self.legend = TLegend(x_low, y_up - 0.04 * n_labels, x_up, y_up)
+        x_low, _, x_up, y_up = self.__adjust_legend_coordinates(0.5, 0.7, 1, 0.89)
+        self.legend = TLegend(x_low, y_up - 0.05 * n_labels, x_up, y_up)
         self.legend.SetNColumns(self._legend_n_columns)
         # Make legend transparent and remove border
         self.legend.SetFillStyle(0)
         self.legend.SetLineWidth(0)
+        # TODO this has to synced correctly with the line height of the legend which
+        #      atm is 0.05 (see above)
         self.legend.SetTextSize(self.__adjust_text_size(0.015))
         self.legend.SetTextFont(63)
 
@@ -338,7 +346,9 @@ class ROOTPlot(PlotSpec): # pylint: disable=too-many-instance-attributes
             axis.SetTitleFont(63)
             axis.SetTitleSize(self.__adjust_text_size(self.axes[0].title_size))
             axis.SetLabelSize(self.__adjust_text_size(self.axes[0].label_size))
-            # TODO properly compute offsets
+            # TODO properly compute offsets, the following is a wild guess for now
+            margin = self.__adjust_row_margin(self._row_margins[0])
+            axis.SetTitleOffset(19 * margin)
         if self._share_y:
             # no labels or title in case of shared y-axis
             self.frame.GetYaxis().SetTitleSize(0)
@@ -349,7 +359,9 @@ class ROOTPlot(PlotSpec): # pylint: disable=too-many-instance-attributes
             axis.SetTitleFont(63)
             axis.SetTitleSize(self.__adjust_text_size(self.axes[1].title_size))
             axis.SetLabelSize(self.__adjust_text_size(self.axes[1].label_size))
-            # TODO properly compute offsets
+            # TODO properly compute offsets, the following is a wild guess for now
+            margin = self.__adjust_column_margin(self._column_margins[0])
+            axis.SetTitleOffset(23 * margin)
 
 
     def __draw_text(self):

@@ -1,68 +1,67 @@
-from ROOT import TFile
+from array import array
+from os import getpid
 
-from hfplot.plot import make_grid
-from hfplot.style import generate_styles
+from ROOT import TRandom, TGraph, TH1F, TF1, kBlack
 
-file_name = "/path/to/rootfile"
-histo_name = "histName"
+from hfplot.plot_helpers import make_grid
+from hfplot.style import generate_styles, ROOTStyle1D
 
-file = TFile(file_name, "READ")
-hist = file.Get(histo_name)
 
+##########################################
+# first define some objects to play with #
+##########################################
+
+random = TRandom(getpid())
+
+# Construct a TGraph to play with
+n_points = 100
+graph = TGraph(n_points)
+for i in range(n_points):
+    graph.SetPoint(i, random.Gaus(16.5, 5), random.Poisson(21))
+
+
+# Create a histogram to play with
+bin_edges = array("d", [2, 3, 5, 7, 11, 13, 17, 19])
+hist = TH1F("some_histogram", "", len(bin_edges) - 1, bin_edges)
+
+# Fill histogram from a random number generation
+for i in range(len(bin_edges) - 1):
+    hist.SetBinContent(i + 1, random.Poisson(42))
+    hist.SetBinError(i + 1, random.Gaus(10))
+
+# And now add a function
+func = TF1("func","84*sin(x)*sin(x)/x", 1, 10)
+
+###################################
+# The actual plotting starts here #
+###################################
 
 # Generate 5 styles, keep markerstyle the same for all
 styles = generate_styles(5, markerstyles=[34])
+styles_graphs = generate_styles(5, markerstyles=[21], draw_options=["P"])
+# make explicity style for the function
+func_style = ROOTStyle1D()
+func_style.linecolor = kBlack
 
-n_cols_rows = 3
-# Define a NxN grid with overall margins on the left, bottom, right and top
-figure = make_grid(n_cols_rows, 0.1, 0.1, 0.05, 0.05) #, 0.05, 0.05)
+# number of columns and rows
+n_cols = 3
+n_rows = 4
 
-for i in range(n_cols_rows**2):
+# Define a MxN grid with overall margins on the left, bottom, right and top
+figure = make_grid((n_cols, n_rows), 0.08, 0.05, 0.05, 0.05, size=(1000, 1000),
+                   x_title="x_title", y_title="y_title")
+
+for i in range(n_cols * n_rows):
+    # change current plot
     figure.change_plot(i)
-    figure.add_object(hist, style=styles[0], label=f"MyLabel{i}")
+    # Add a histogram
+    figure.add_object(hist, style=styles[i % len(styles)], label=f"MyHist{i}")
+    # Add another object, say a TGraph
+    figure.add_object(graph, style=styles_graphs[i % len(styles_graphs)], label=f"MyGraph_{i}")
+    # Add another object, now a TF1
+    figure.add_object(func, style=func_style, label=f"MyFunc_{i}")
+    # And some text
+    figure.add_text("Text", 0.5, 0.1)
 
 figure.create()
-figure.save("test_grid_nxn.eps")
-
-
-
-
-# At the moment plots are defined explicitly but this should be made easier
-# and automatically so nobody has to think which plots share axes with others
-#
-# plot_bottom_left = figure.define_plot(0, 0)
-# figure.add_object(hist, style=styles[0], label="MyLabel1")
-#
-# plot_bottom_middle = figure.define_plot(1, 0, share_y=plot_bottom_left)
-# figure.add_object(hist, style=styles[0], label="MyLabel2")
-#
-# plot_bottom_right = figure.define_plot(2, 0, share_y=plot_bottom_left)
-# figure.add_object(hist, style=styles[0], label="MyLabel3")
-#
-# plot_middle_left = figure.define_plot(0, 1, share_x=plot_bottom_left)
-# figure.add_object(hist, style=styles[0], label="MyLabel4")
-#
-# plot_top_left = figure.define_plot(0, 2, share_x=plot_bottom_left)
-# figure.add_object(hist, style=styles[0], label="MyLabel7")
-#
-# figure.define_plot(1, 1, share_x=plot_bottom_middle, share_y=plot_middle_left)
-# figure.add_object(hist, style=styles[0], label="MyLabel5")
-#
-# figure.define_plot(2, 1, share_x=plot_bottom_right, share_y=plot_middle_left)
-# figure.add_object(hist, style=styles[0], label="MyLabel6")
-#
-# figure.define_plot(1, 2, share_x=plot_bottom_middle, share_y=plot_top_left)
-# figure.add_object(hist, style=styles[0], label="MyLabel8")
-#
-# figure.define_plot(2, 2, share_x=plot_bottom_right, share_y=plot_top_left)
-# figure.add_object(hist, style=styles[0], label="MyLabel9")
-
-
-
-
-# until now, nothing actually happened, the above is really only a specification
-# only with this call things are actually created and drawn
-# figure.create()
-#
-# # and now saved
-# figure.save("test_grid_nxn.eps")
+figure.save("test_grid_mxn.eps")

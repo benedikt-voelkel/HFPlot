@@ -21,6 +21,9 @@ def make_grid(n_cols_rows, margin_left, margin_bottom, margin_right=0.05,
 
 
     size = kwargs.pop("size", (600, 600))
+    x_title = kwargs.pop("x_title", None)
+    y_title = kwargs.pop("y_title", None)
+
     try:
         iter(n_cols_rows)
         n_cols = n_cols_rows[0]
@@ -62,6 +65,8 @@ def make_grid(n_cols_rows, margin_left, margin_bottom, margin_right=0.05,
             if j == 0:
                 share_y = None
             plot = figure.define_plot(j, i, share_x=share_x, share_y=share_y)
+            plot.axes[0].title = x_title
+            plot.axes[1].title = y_title
             if i == 0:
                 share_x = plot
             if j == 0:

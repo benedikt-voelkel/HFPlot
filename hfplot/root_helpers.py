@@ -7,6 +7,7 @@ from ROOT import TH1C, TH1S, TH1I, TH1F, TH1D, TEfficiency, TGraph, TF1, TF12, T
 from ROOT import Double # pylint: disable=no-name-in-module
 
 from hfplot.logger import get_logger
+from hfplot.utilities import try_method
 
 MIN_LOG_SCALE = 0.00000000001
 
@@ -71,8 +72,7 @@ def get_root_object_store():
 def detach_from_root_directory(root_object):
     """Detatch ROOT object from potential TDirectory
     """
-    if hasattr(root_object, "SetDirectory"):
-        root_object.SetDirectory(0)
+    try_method(root_object, "SetDirectory", 0)
 
 
 def clone_root(root_object, proposed_name=None, detach=True):
@@ -327,7 +327,7 @@ def find_boundaries(objects, x_low=None, x_up=None, y_low=None, y_up=None, x_log
         y_low_new_no_user = min(y_low_est_no_user, y_low_new_no_user)
 
 
-    if y_up_new < y_up_new_no_user and not y_force_limits:
+    if y_up is not None and y_up_new < y_up_new_no_user and not y_force_limits:
         # only do it if y-limits are not forced
         get_logger().warning("The upper y-limit was chosen to be %f which is however too small " \
         "to fit the plots. It is adjusted to the least maximum value of %f.",
@@ -335,7 +335,7 @@ def find_boundaries(objects, x_low=None, x_up=None, y_low=None, y_up=None, x_log
 
         y_up_new = y_up_new_no_user
 
-    if y_low_new > y_low_new_no_user and not y_force_limits:
+    if y_low is not None and y_low_new > y_low_new_no_user and not y_force_limits:
         # only do it if y-limits are not forced
         get_logger().warning("The lower y-limit was chosen to be %f which is however too large " \
         "to fit the plots. It is adjusted to the least maximum value of %f.",
@@ -343,20 +343,18 @@ def find_boundaries(objects, x_low=None, x_up=None, y_low=None, y_up=None, x_log
 
         y_low_new = y_low_new_no_user
 
-
-
-
     # Adjust a bit top and bottom otherwise maxima and minima will exactly touch the x-axis
     y_diff = y_up_new - y_low_new
-    y_divide = y_up_new / y_low_new
     if y_low is None:
         if y_log:
+            y_divide = y_up_new / y_low_new
             y_low_new /= y_divide * 100
         else:
             y_low_new -= 0.1 * y_diff
 
     if y_up is None and reserve_ndc_top is None:
         if y_log:
+            y_divide = y_up_new / y_low_new
             y_up_new *= y_divide * 100
         else:
             y_up_new += 0.1 * y_diff
