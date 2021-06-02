@@ -346,6 +346,9 @@ def find_boundaries(objects, x_low=None, x_up=None, y_low=None, y_up=None, x_log
 
         y_low_new = y_low_new_no_user
 
+    if y_log and y_low_new <= 0:
+            y_low_new = MIN_LOG_SCALE
+
     # Adjust a bit top and bottom otherwise maxima and minima will exactly touch the x-axis
     if y_log:
         y_diff = log10(y_up_new) - log10(y_low_new)
