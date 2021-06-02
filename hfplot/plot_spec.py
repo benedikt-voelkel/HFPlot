@@ -363,7 +363,7 @@ class FigureSpec: # pylint: disable=too-many-instance-attributes
 
         if not cols_rows:
             # just find the next free cell
-            cell = (set(range(self.n_cols * self.n_rows)) - set(self.cells_taken))[0]
+            cell = liest((set(range(self.n_cols * self.n_rows)) - set(self.cells_taken)))[0]
             col_low = cell % self.n_cols
             row_low = cell % self.n_rows
             col_up = col_low
