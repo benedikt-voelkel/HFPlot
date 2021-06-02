@@ -19,7 +19,7 @@ bin_edges = array("d", [2, 3, 5, 7, 11, 13, 17, 19])
 hist_1 = TH1F("some_histogram_1", "", len(bin_edges) - 1, bin_edges)
 hist_2 = TH1F("some_histogram_2", "", len(bin_edges) - 1, bin_edges)
 # Fill histogram from a random number generation
-for i in range(len(bin_edges) - 1):
+for i in range(len(bin_edges) + 1):
     hist_1.SetBinContent(i + 1, random.Poisson(42))
     hist_1.SetBinError(i + 1, random.Gaus(10))
     hist_2.SetBinContent(i + 1, random.Poisson(42))
@@ -37,7 +37,7 @@ styles = generate_styles(5, markerstyles=[34])
 figure = ROOTFigure(3, 4, size=(600, 600), column_margin=(0.05, 0.025))
 
 # define a plot from cell (1, 1) to cell (2, 2)
-figure.define_plot(1, 1, 2, 2)
+figure.define_plot(1, 1, 2, 2, y_log=True)
 # internally, set to current plot so we can add objects
 figure.add_object(hist_1, style=styles[0], label="MyLabel1")
 figure.add_object(hist_2, style=styles[1], label="MyLabel2")

@@ -18,7 +18,7 @@ bin_edges = array("d", [2, 3, 5, 7, 11, 13, 17, 19])
 hist_1 = TH1F("some_histogram_1", "", len(bin_edges) - 1, bin_edges)
 hist_2 = TH1F("some_histogram_2", "", len(bin_edges) - 1, bin_edges)
 # Fill histogram from a random number generation
-for i in range(len(bin_edges) - 1):
+for i in range(len(bin_edges) + 1):
     hist_1.SetBinContent(i + 1, random.Poisson(42))
     hist_1.SetBinError(i + 1, random.Gaus(10))
     hist_2.SetBinContent(i + 1, random.Poisson(42))

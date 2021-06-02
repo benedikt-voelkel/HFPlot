@@ -2,6 +2,7 @@
 """
 
 import sys
+from math import log10
 
 from ROOT import TH1C, TH1S, TH1I, TH1F, TH1D, TEfficiency, TGraph, TF1, TF12, TF2, TF3 # pylint: disable=no-name-in-module
 from ROOT import Double # pylint: disable=no-name-in-module
@@ -112,39 +113,41 @@ def find_boundaries_TH1(histo, x_low=None, x_up=None, y_low=None, y_up=None): # 
 
     n_bins_x = histo.GetNbinsX()
 
+    start_bin = 1
     if x_low is None:
         # first set to lowest x-value
         x_low = histo.GetXaxis().GetXmin()
         for i in range(1, n_bins_x + 1):
             # start at bin 1 and find first bin with non-zero content
-            if histo.GetBinContent(i) != 0:
+            if histo.GetBinContent(i):
                 x_low = histo.GetXaxis().GetBinLowEdge(i)
+                # remember this to be the first for the determination of the y-range
+                start_bin = i
                 break
 
+    end_bin = n_bins_x
     if x_up is None:
         # first set to highest x-value
         x_up = histo.GetXaxis().GetXmax()
         for i in range(n_bins_x, 0, -1):
             # start at last bin and find first bin with non-zero content
-            if histo.GetBinContent(i) != 0:
+            if histo.GetBinContent(i):
                 x_up = histo.GetXaxis().GetBinUpEdge(i)
+                # remember this to be the last for the determination of the y-range
+                end_bin = i
                 break
-
-    # now found a particular x-range, search y values within this range
-    start_bin = max(1, histo.GetXaxis().FindBin(x_low))
-    end_bin = min(histo.GetNbinsX(), histo.GetXaxis().FindBin(x_up))
 
     if y_low is None:
         # go bin by bin and take y-errors into account
         y_low = histo.GetBinContent(start_bin) - histo.GetBinError(start_bin)
-        for i in range(start_bin + 1, end_bin + 1):
+        for i in range(start_bin, end_bin + 1):
             min_tmp = histo.GetBinContent(i) - histo.GetBinError(i)
             y_low = min(min_tmp, y_low)
 
     if y_up is None:
         # go bin by bin and take y-errors into account
         y_up = histo.GetBinContent(start_bin) + histo.GetBinError(start_bin)
-        for i in range(start_bin + 1, end_bin + 1):
+        for i in range(start_bin, end_bin + 1):
             max_tmp = histo.GetBinContent(i) + histo.GetBinError(i)
             y_up = max(max_tmp, y_up)
 
@@ -344,18 +347,19 @@ def find_boundaries(objects, x_low=None, x_up=None, y_low=None, y_up=None, x_log
         y_low_new = y_low_new_no_user
 
     # Adjust a bit top and bottom otherwise maxima and minima will exactly touch the x-axis
-    y_diff = y_up_new - y_low_new
+    if y_log:
+        y_diff = log10(y_up_new) - log10(y_low_new)
+    else:
+        y_diff = y_up_new - y_low_new
     if y_low is None:
         if y_log:
-            y_divide = y_up_new / y_low_new
-            y_low_new /= y_divide * 100
+            y_low_new = 10**(log10(y_low_new) - y_diff * 0.1)
         else:
             y_low_new -= 0.1 * y_diff
 
     if y_up is None and reserve_ndc_top is None:
         if y_log:
-            y_divide = y_up_new / y_low_new
-            y_up_new *= y_divide * 100
+            y_up_new = 10**(log10(y_up_new) + y_diff * 0.1)
         else:
             y_up_new += 0.1 * y_diff
 
@@ -372,13 +376,30 @@ def find_boundaries(objects, x_low=None, x_up=None, y_low=None, y_up=None, x_log
         "is requested. Set value was %d and reset value is now %d", y_low_new, MIN_LOG_SCALE)
         y_low_new = MIN_LOG_SCALE
 
+    if x_low_new <= 0 and x_log:
+        # If not compatible with log scale, force it to be
+        # Can happen if fixed by user - but incompatible -
+        # and at the same time log scale is requested
+        get_logger().warning("Have to set x-minimum to something larger than 0 since log-scale " \
+        "is requested. Set value was %d and reset value is now %d", x_low_new, MIN_LOG_SCALE)
+        x_low_new = MIN_LOG_SCALE
+
+
     # compute what we need for the legend
     if reserve_ndc_top and not y_force_limits:
-        y_diff = y_up_new - y_low_new
-        y_diff_up_user_no_user = y_up_new - y_up_new_no_user
+        if y_log:
+            y_diff = log10(y_up_new) - log10(y_low_new)
+            y_diff_up_user_no_user = log10(y_up_new) - log10(y_up_new_no_user)
+        else:
+            y_diff = y_up_new - y_low_new
+            y_diff_up_user_no_user = y_up_new - y_up_new_no_user
         if y_diff_up_user_no_user / y_diff < reserve_ndc_top:
-            y_diff_with_legend = y_diff / (1 - reserve_ndc_top)
             get_logger().info("Add space to fit legend")
-            y_up_new = y_low_new + y_diff_with_legend + 0.1 * y_diff
+            y_diff_with_legend = y_diff / (1 - reserve_ndc_top)
+            if y_log:
+                y_up_new = 10**(log10(y_low_new) + y_diff_with_legend + 0.1 * y_diff)
+            else:
+                y_diff_with_legend = y_diff / (1 - reserve_ndc_top)
+                y_up_new = y_low_new + y_diff_with_legend + 0.1 * y_diff
 
     return x_low_new, x_up_new, y_low_new, y_up_new

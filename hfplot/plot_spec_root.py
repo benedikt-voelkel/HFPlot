@@ -187,7 +187,7 @@ class ROOTPlot(PlotSpec): # pylint: disable=too-many-instance-attributes
         self.axes[0].limits[1], self.axes[1].limits[0],
         self.axes[1].limits[1],
         reserve_ndc_top=kwargs.pop("reserve_ndc_top", None),
-        y_force_limits=y_force_limits)
+        y_force_limits=y_force_limits, x_log=self.axes[0].is_log, y_log=self.axes[1].is_log)
 
         # add titles to axes if not specified by the user by trying to
         # use those which are set for any ROOT object
@@ -405,12 +405,22 @@ class ROOTPlot(PlotSpec): # pylint: disable=too-many-instance-attributes
 
         self.name = name
         self.pad = TPad(name, "", *self._rel_coordinates)
+
         self.pad.Draw()
+
+        if self.axes[1].is_log:
+            self.pad.SetLogy()
+        if self.axes[0].is_log:
+            self.pad.SetLogx()
+
+
+
 
         # remember if another TPad was active before
         prev_pad = gPad.cd() if gPad else None
         # but for now change to this TPad
         self.pad.cd()
+
 
         # This HAS to come before the frame creation
         self.pad.SetLeftMargin(self.__adjust_column_margin(self._column_margins[0]))

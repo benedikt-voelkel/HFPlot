@@ -331,8 +331,20 @@ class FigureSpec: # pylint: disable=too-many-instance-attributes
         """
         self._plot_specs.append(plot_spec)
 
+    def consume_plot_kwargs(self, **kwargs):
+        """Forward keyword arguments for plot
+        """
+        self._current_plot_spec.axes[0].is_log = \
+        kwargs.pop("x_log", self._current_plot_spec.axes[0].is_log) # pylint: disable=protected-access
+        self._current_plot_spec.axes[1].is_log = \
+        kwargs.pop("y_log", self._current_plot_spec.axes[1].is_log) # pylint: disable=protected-access
+        self._current_plot_spec.axes[2].is_log = \
+        kwargs.pop("z_log", self._current_plot_spec.axes[2].is_log) # pylint: disable=protected-access
+        self._current_plot_spec._share_x = kwargs.pop("share_x", None) # pylint: disable=protected-access
+        self._current_plot_spec._share_y = kwargs.pop("share_y", None) # pylint: disable=protected-access
 
-    def define_plot(self, col_low, row_low, col_up=None, row_up=None, share_x=None, share_y=None):
+
+    def define_plot(self, *cols_rows, **kwargs):
         """User interface to define how cells are combined to form cells where
            the plots should go
 
@@ -343,21 +355,28 @@ class FigureSpec: # pylint: disable=too-many-instance-attributes
                     upper value will be equal to the lower value
             row_up: int specifying upper row cell, default None in which case
                     upper value will be equal to the lower value
-            share_x: PlotSpec to share x-axis with, default is None
-            share_y: PlotSpec to share y-axis with, default is None
 
         Returns:
             PlotSpec
                 created PlotSpec
         """
 
-        if col_up is None:
-            # assume same column for low and up
+        if not cols_rows:
+            # just find the next free cell
+            cell = (set(range(self.n_cols * self.n_rows)) - set(self.cells_taken))[0]
+            col_low = cell % self.n_cols
+            row_low = cell % self.n_rows
             col_up = col_low
-
-        if row_up is None:
-            # assume same row for low and up
             row_up = row_low
+        elif len(cols_rows) == 3 or len(cols_rows) > 4:
+            raise ValueError("Plot cannot be specified by 3 or more than 4 arguments")
+        elif len(cols_rows) == 2:
+            # One cell
+            col_low, row_low = cols_rows
+            col_up, row_up = cols_rows
+        else:
+            # fully specified
+            col_low, row_low, col_up, row_up = cols_rows
 
         if row_low < 0 or col_low < 0:
             raise ValueError("The minimum allowed row and column are 0.")
@@ -376,9 +395,7 @@ class FigureSpec: # pylint: disable=too-many-instance-attributes
         # Set current PlotSpec
         self._current_plot_spec = self._plot_specs[-1]
 
-        # might be have shared x- or y-axes
-        self._current_plot_spec._share_x = share_x # pylint: disable=protected-access
-        self._current_plot_spec._share_y = share_y # pylint: disable=protected-access
+        self.consume_plot_kwargs(**kwargs)
 
         return self._current_plot_spec
 
