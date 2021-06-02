@@ -1,6 +1,8 @@
 """Implementing plot specifications
 """
 
+from copy import copy
+
 from hfplot.logger import get_logger, configure_logger
 
 configure_logger(True)
@@ -128,6 +130,9 @@ class FigureSpec: # pylint: disable=too-many-instance-attributes
 
         # set current PlotSpec internally to be able to provide some proxy methods
         self._current_plot_spec = None
+
+        # default axes settings
+        self._default_axes = [AxisSpec(), AxisSpec(), AxisSpec()]
 
         # quickly refer to logger
         self.logger = get_logger()
@@ -272,6 +277,9 @@ class FigureSpec: # pylint: disable=too-many-instance-attributes
                     continue
                 self.__add_cell(cell_current + j)
 
+    def __set_defaults_for_plot_spec(self, plot_spec):
+        for i, ax enumerate(self._default_axes):
+            plot_spec.axes[i] = copy(ax)
 
     def __make_plot_spec(self, col_low, row_low, col_up, row_up):
         """Compute properties and create a PlotSpec from cells the user wants
@@ -316,6 +324,8 @@ class FigureSpec: # pylint: disable=too-many-instance-attributes
         plot_spec._column_margins = (self._column_margins[col_low][0], # pylint: disable=protected-access
                                      self._column_margins[col_up][1])
         plot_spec._row_margins = (self._row_margins[row_low][0], self._row_margins[row_up][1]) # pylint: disable=protected-access
+
+        self.__set_defaults_for_plot_spec(plot_spec)
         return plot_spec
 
 
@@ -431,3 +441,18 @@ class FigureSpec: # pylint: disable=too-many-instance-attributes
             self.logger.warning("No current plot to add text")
             return
         self._current_plot_spec.add_text(text, x_low, y_low, size)
+
+
+    def axis_label_size(self, size):
+        for ax in self._default_axes:
+            ax.label_size = size
+        for ps in self._plot_specs:
+            for ax in ps.axes:
+                ax.label_size = size
+
+    def axis_title_size(self, size):
+        for ax in self._default_axes:
+            ax.title_size = size
+        for ps in self._plot_specs:
+            for ax in ps.axes:
+                ax.title_size = size
