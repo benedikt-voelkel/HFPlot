@@ -148,6 +148,9 @@ else:
   file = TFile(another_filename, "READ")
   for i in range(5):
     figure.add_object(file.Get(f"histogram_{i}"), label=f"hist {i}")
+
+figure.create()
+figure.save("/path/to/save")
 ```
 
 
