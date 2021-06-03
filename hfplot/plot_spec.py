@@ -37,6 +37,7 @@ class LegendSpec: # pylint: disable=too-many-instance-attributes, too-few-public
         self.position = "top right"
         self.text_size = 0.015
         self.n_columns = 1
+        self.principal_position = None
 
 
 

@@ -283,7 +283,7 @@ class ROOTPlot(PlotSpec): # pylint: disable=too-many-instance-attributes
                           self.__adjust_row_margin(self._row_margins[0]),
                           1 - self.__adjust_row_margin(self._row_margins[1]))
 
-    def __create_legends(self):
+    def __create_legends(self): # pylint: disable=too-many-branches
         """Create legend(s)
 
         So far it only makes one legend but it should be possible to create
@@ -304,24 +304,36 @@ class ROOTPlot(PlotSpec): # pylint: disable=too-many-instance-attributes
 
         # adjust legend position starting from top right as default
         coordinates = [0.5, 0.7, 1, 0.89]
+        if not isinstance(self._legend_spec.position, str):
+            # assume relative coordinates
+            coordinates = self._legend_spec.position
+            # TODO that is rough
+            if coordinates[3] < 0.5 and not self._legend_spec.principal_position:
+                self._legend_spec.principal_position = "bottom"
+            elif not self._legend_spec.principal_position:
+                self._legend_spec.principal_position = "top"
+        else:
+            # deal with text string position
+            # however, catch this one...
+            if "left" in self._legend_spec.position and "right" in self._legend_spec.position:
+                raise ValueError("Choose EITHER \"left\" OR \"right\" for legend positioning")
+            if "bottom" in self._legend_spec.position and "top" in self._legend_spec.position:
+                raise ValueError("Choose EITHER \"bottom\" OR \"top\" for legend positioning")
 
-        # however, catch this one...
-        if "left" in self._legend_spec.position and "right" in self._legend_spec.position:
-            raise ValueError("Choose EITHER \"left\" OR \"right\" for legend positioning")
-        if "bottom" in self._legend_spec.position and "top" in self._legend_spec.position:
-            raise ValueError("Choose EITHER \"bottom\" OR \"top\" for legend positioning")
-
-        # and now really adjust the coordinates
-        if "left" in self._legend_spec.position:
-            coordinates[0], coordinates[2] = (0.1, 0.5)
-        if "bottom" in self._legend_spec.position:
-            coordinates[1] = 0.1
+            # and now really adjust the coordinates
+            if "left" in self._legend_spec.position:
+                coordinates[0], coordinates[2] = (0.1, 0.5)
+            if "bottom" in self._legend_spec.position:
+                coordinates[1] = 0.1
+                if not self._legend_spec.principal_position:
+                    self._legend_spec.principal_position = "bottom"
+            elif not self._legend_spec.principal_position:
+                self._legend_spec.principal_position = "top"
         coordinates = self.__adjust_legend_coordinates(coordinates)
-        if "bottom" in self._legend_spec.position:
+        if self._legend_spec.principal_position == "bottom":
             coordinates[3] = coordinates[1] + 0.05 * n_labels
         else:
             coordinates[1] = coordinates[3] - 0.05 * n_labels
-            self._legend_spec.position = self._legend_spec.position + " top"
 
         self.legend = TLegend(*coordinates)
         self.legend.SetNColumns(self._legend_spec.n_columns)
@@ -361,8 +373,10 @@ class ROOTPlot(PlotSpec): # pylint: disable=too-many-instance-attributes
             axis.SetTitleSize(self.__adjust_text_size(self._axes[0].title_size))
             axis.SetLabelSize(self.__adjust_text_size(self._axes[0].label_size))
             # TODO properly compute offsets, the following is a wild guess for now
-            margin = self.__adjust_row_margin(self._row_margins[0])
-            axis.SetTitleOffset(19 * margin)
+            #margin = self.__adjust_row_margin(self._row_margins[0])
+            if self._axes[0].title_offset is not None:
+                axis.SetTitleOffset(self.__adjust_column_margin(self._axes[0].title_offset))
+            #axis.SetTitleOffset(19 * margin)
         if self._share_y:
             # no labels or title in case of shared y-axis
             self.frame.GetYaxis().SetTitleSize(0)
@@ -374,8 +388,10 @@ class ROOTPlot(PlotSpec): # pylint: disable=too-many-instance-attributes
             axis.SetTitleSize(self.__adjust_text_size(self._axes[1].title_size))
             axis.SetLabelSize(self.__adjust_text_size(self._axes[1].label_size))
             # TODO properly compute offsets, the following is a wild guess for now
-            margin = self.__adjust_column_margin(self._column_margins[0])
-            axis.SetTitleOffset(23 * margin)
+            #margin = self.__adjust_column_margin(self._column_margins[0])
+            if self._axes[1].title_offset is not None:
+                axis.SetTitleOffset(self.__adjust_column_margin(self._axes[1].title_offset))
+            #axis.SetTitleOffset(23 * margin)
 
 
     def __draw_text(self):
@@ -448,13 +464,13 @@ class ROOTPlot(PlotSpec): # pylint: disable=too-many-instance-attributes
         self.__style_objects(**kwargs)
         self.__create_legends()
 
-        if self.legend and "top" in self._legend_spec.position:
+        if self.legend and self._legend_spec.principal_position == "top":
             kwargs["reserve_ndc_top"] = \
             1 - map_value(self.legend.GetY1(),
                           self.__adjust_row_margin(self._row_margins[0]),
                           1 - self.__adjust_row_margin(self._row_margins[1]),
                           0, 1)
-        elif self.legend and "bottom" in self._legend_spec.position:
+        elif self.legend and self._legend_spec.principal_position == "bottom":
             kwargs["reserve_ndc_bottom"] = \
             map_value(self.legend.GetY2(),
                           self.__adjust_row_margin(self._row_margins[0]),

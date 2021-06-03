@@ -108,7 +108,8 @@ def clone_root(root_object, proposed_name=None, detach=True):
     return obj
 
 
-def find_boundaries_TH1(histo, x_low=None, x_up=None, y_low=None, y_up=None): # pylint: disable=unused-argument, invalid-name
+def find_boundaries_TH1(histo, x_low=None, x_up=None, y_low=None, y_up=None,
+                        x_log=False, y_log=False): # pylint: disable=unused-argument, invalid-name
     """find the x- and y-axes boundaries specifically for 1D TH1
 
     Args:
@@ -134,9 +135,12 @@ def find_boundaries_TH1(histo, x_low=None, x_up=None, y_low=None, y_up=None): # 
             # start at bin 1 and find first bin with non-zero content
             if histo.GetBinContent(i):
                 x_low = histo.GetXaxis().GetBinLowEdge(i)
-                # remember this to be the first for the determination of the y-range
-                start_bin = i
-                break
+                if (x_low > 0 and x_log) or not x_log:
+                    # first of all keep going in case that is 0 and we have x-log scale
+                    # at the same time if not or if not log scale,
+                    # remember this to be the first bin for the determination of the y-range
+                    start_bin = i
+                    break
 
     end_bin = n_bins_x
     if x_up is None:
@@ -155,6 +159,8 @@ def find_boundaries_TH1(histo, x_low=None, x_up=None, y_low=None, y_up=None): # 
         y_low = histo.GetBinContent(start_bin) - histo.GetBinError(start_bin)
         for i in range(start_bin, end_bin + 1):
             min_tmp = histo.GetBinContent(i) - histo.GetBinError(i)
+            if min_tmp <= 0 and y_log:
+                continue
             y_low = min(min_tmp, y_low)
 
     if y_up is None:
@@ -167,7 +173,8 @@ def find_boundaries_TH1(histo, x_low=None, x_up=None, y_low=None, y_up=None): # 
     return x_low, x_up, y_low, y_up
 
 
-def find_boundaries_TF1(func, x_low=None, x_up=None, y_low=None, y_up=None): # pylint: disable=invalid-name
+def find_boundaries_TF1(func, x_low=None, x_up=None, y_low=None, y_up=None,
+                        x_log=False, y_log=False): # pylint: disable=invalid-name
     """find the x- and y-axes boundaries specifically for 1D TF1
 
     Args:
@@ -200,7 +207,8 @@ def find_boundaries_TF1(func, x_low=None, x_up=None, y_low=None, y_up=None): # p
     return x_low, x_up, y_low, y_up
 
 
-def find_boundaries_TGraph(graph, x_low=None, x_up=None, y_low=None, y_up=None): # pylint: disable=invalid-name
+def find_boundaries_TGraph(graph, x_low=None, x_up=None, y_low=None, y_up=None,
+                           x_log=False, y_log=False): # pylint: disable=invalid-name
     """find the x- and y-axes boundaries specifically for 1D TGraph
 
     Args:
@@ -310,21 +318,21 @@ def find_boundaries(objects, x_low=None, x_up=None, y_low=None, y_up=None, x_log
             continue
         if isinstance(obj, ROOT_OBJECTS_HIST_1D):
             x_low_est, x_up_est, y_low_est, y_up_est = \
-            find_boundaries_TH1(obj, x_low, x_up, y_low, y_up)
+            find_boundaries_TH1(obj, x_low, x_up, y_low, y_up, x_log, y_log)
             x_low_est_no_user, x_up_est_no_user, y_low_est_no_user, y_up_est_no_user = \
-            find_boundaries_TH1(obj)
+            find_boundaries_TH1(obj, x_log=x_log, y_log=y_log)
         elif isinstance(obj, TF1) and not isinstance(obj, ROOT_OBJECTS_NOT_1D):
             x_low_est, x_up_est, y_low_est, y_up_est = \
-            find_boundaries_TF1(obj, x_low, x_up, y_low, y_up)
+            find_boundaries_TF1(obj, x_low, x_up, y_low, y_up, x_log, y_log)
             x_low_est_no_user, x_up_est_no_user, y_low_est_no_user, y_up_est_no_user = \
-            find_boundaries_TF1(obj)
+            find_boundaries_TF1(obj, x_log=x_log, y_log=y_log)
         elif isinstance(obj, TGraph):
             x_low_est, x_up_est, y_low_est, y_up_est = \
-            find_boundaries_TGraph(obj, x_low, x_up, y_low, y_up)
+            find_boundaries_TGraph(obj, x_low, x_up, y_low, y_up, x_log, y_log)
             if x_low_est is None:
                 continue
             x_low_est_no_user, x_up_est_no_user, y_low_est_no_user, y_up_est_no_user = \
-            find_boundaries_TGraph(obj)
+            find_boundaries_TGraph(obj, x_log=x_log, y_log=y_log)
         elif isinstance(obj, TEfficiency):
             get_logger().warning("Finding boundaries for TEfficiency not yet implemented")
             continue
@@ -436,7 +444,6 @@ def find_boundaries(objects, x_low=None, x_up=None, y_low=None, y_up=None, x_log
             y_diff_low_user_no_user = y_low_new_no_user - y_low_new
         if y_diff_low_user_no_user / y_diff < reserve_ndc_bottom:
             get_logger().info("Add space to fit legend")
-            print(reserve_ndc_bottom)
             y_diff_with_legend = y_diff / (1 - reserve_ndc_bottom)
             if y_log:
                 y_low_new = 10**(log10(y_up_new) - y_diff_with_legend - 0.1 * y_diff)
