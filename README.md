@@ -21,6 +21,8 @@ As usual, it is recommended to do so inside a Python `virtualenv` since this pac
 This package basically provides a Pythonic wrapper around plotting backends. For instance, the `ROOT` plotting
 experience can be somewhat *special*, more on that later.
 
+A **disclaimer**: So far, it has been focused on making 1D objects work. You could throw a 2D object and see what happens, but it might brutally fail.
+
 ### FigureSpec
 
 First of, an overall figure is defined using a `FigureSpec` object. For instance, a grid of a number of columns and rows is created with
@@ -127,6 +129,28 @@ Actually, you can go back and forth adding objects of plots, change properties a
 # everything defined
 figure.create()
 figure.save("/path/to/save")
+```
+
+#### Automatic ROOT style generation
+
+The class `ROOTStyle1D` provides quick specification of `ROOT` specific styling of 1D objects. This shall be updated to become a generic `StyleSpec` class.
+
+In any case, a number `n` of styles can be generated with
+```python
+styles = generate_styles(n)
+
+# ...
+plot.add_object(ROOTObject, style=styles[0])
+# ...
+```
+
+#### Adding text
+
+Also, text can be added specifying what should be written including the relative positioning inside the plot with
+```python
+# ...
+plot.add_text("My text", 0.1, 0.1)
+# ...
 ```
 
 #### A last comment on `ROOT` objects
