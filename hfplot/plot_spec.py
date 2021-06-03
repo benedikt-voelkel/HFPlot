@@ -131,6 +131,15 @@ class PlotSpec: # pylint: disable=too-few-public-methods, too-many-instance-attr
                 setattr(ax, k, v)
 
 
+    def legend(self, **kwargs):
+        """set legend properties
+        """
+        for k, v in kwargs.items():
+            if not hasattr(self._legend_spec, k):
+                get_logger().warning("Unknown attribute %s of LegendSpec", k)
+                continue
+            setattr(self._legend_spec, k, v)
+
 class FigureSpec: # pylint: disable=too-many-instance-attributes
     """Specification of the overall figure
     (which people might call TCanvas in ROOT or Figure in matplotlib)
@@ -537,7 +546,10 @@ class FigureSpec: # pylint: disable=too-many-instance-attributes
     def legend(self, **kwargs):
         """set legend properties
         """
-        # TODO make flexible in the way axes properties are changed
-        self._default_legend.text_size = kwargs.pop("text_size", self._default_legend.text_size)
-        self._default_legend.position = kwargs.pop("position", self._default_legend.position)
-        self._default_legend.n_columns = kwargs.pop("n_columns", self._default_legend.n_columns)
+        for k, v in kwargs.items():
+            if not hasattr(self._default_legend, k):
+                get_logger().warning("Unknown attribute %s of LegendSpec", k)
+                continue
+            setattr(self._default_legend, k, v)
+            for ps in self._plot_specs:
+                ps.legend(k=v)
