@@ -129,6 +129,28 @@ figure.create()
 figure.save("/path/to/save")
 ```
 
+#### A last comment on `ROOT` objects
+
+Whenever an object is added via `ROOTPlot.add_object`, it is first cloned and detached from a potential owning `TDirectory`. And it is made sure that it gets a unique name so you will never see any weird warnings of the kind **Potential memory leak** caused by `ROOT` having another object of that name already. So that means that the following safely works
+
+```python
+
+# outer scope
+figure = ROOTFigure()
+
+if option == 1:
+  # file opened in inner scope
+  file = TFile(filename, "READ")
+  for i in range(5):
+    figure.add_object(file.Get(f"histogram_{i}"), label=f"hist {i}")
+else:
+  # another file opened in inner scope
+  file = TFile(another_filename, "READ")
+  for i in range(5):
+    figure.add_object(file.Get(f"histogram_{i}"), label=f"hist {i}")
+```
+
+
 ## Examples
 
 For now please refer to the [example](./examples) directory.
