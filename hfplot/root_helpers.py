@@ -43,6 +43,7 @@ class ROOTObjectStore:
 
     def __init__(self):
         self._name_count = {}
+        self._objects = []
         ROOTObjectStore.__instance = self
 
     def create_name(self, root_object, proposed_name=None):
@@ -62,6 +63,18 @@ class ROOTObjectStore:
         else:
             self._name_count[name] += 1
         return f"{name}_{self._name_count[name]}"
+
+    def cache_any(self, obj):
+        """cache any object
+
+        This is mostly meant to be for any ROOT object or objects which hold
+        ROOT objects.
+        It can be used to prevent problems with garbage collection
+
+        Args:
+            obj: any object to be cached
+        """
+        self._objects.append(obj)
 
 
 def get_root_object_store():
@@ -237,7 +250,8 @@ def find_boundaries_TGraph(graph, x_low=None, x_up=None, y_low=None, y_up=None):
 
 
 def find_boundaries(objects, x_low=None, x_up=None, y_low=None, y_up=None, x_log=False, # pylint: disable=unused-argument, too-many-branches, too-many-statements
-                    y_log=False, reserve_ndc_top=None, y_force_limits=False):
+                    y_log=False, reserve_ndc_top=None, reserve_ndc_bottom=None,
+                    y_force_limits=False):
     """Find boundaries for any ROOT objects
 
     Args:
@@ -249,7 +263,9 @@ def find_boundaries(objects, x_low=None, x_up=None, y_low=None, y_up=None, x_log
         x_log: bool whether or not x-axis is log scale
         y_log: bool whether or not y-axis is log scale
         reserve_ndc_top: float or None, specify whether or not some space should be reserved
-                         for the legend
+                         for the legend at the top
+        reserve_ndc_bottom: float or None, specify whether or not some space should be reserved
+                            for the legend at the bottom
         y_force_limits: bool to really force the limits as set by the user regardless of having a
                         potential overlapping legend
     Returns:
@@ -338,6 +354,7 @@ def find_boundaries(objects, x_low=None, x_up=None, y_low=None, y_up=None, x_log
 
         y_up_new = y_up_new_no_user
 
+
     if y_low is not None and y_low_new > y_low_new_no_user and not y_force_limits:
         # only do it if y-limits are not forced
         get_logger().warning("The lower y-limit was chosen to be %f which is however too large " \
@@ -346,15 +363,20 @@ def find_boundaries(objects, x_low=None, x_up=None, y_low=None, y_up=None, x_log
 
         y_low_new = y_low_new_no_user
 
-    if y_log and y_low_new <= 0:
+    if y_log:
+        if y_low_new <= 0:
             y_low_new = MIN_LOG_SCALE
+        if y_low_new_no_user <= 0:
+            y_low_new_no_user = MIN_LOG_SCALE
+
 
     # Adjust a bit top and bottom otherwise maxima and minima will exactly touch the x-axis
     if y_log:
         y_diff = log10(y_up_new) - log10(y_low_new)
     else:
         y_diff = y_up_new - y_low_new
-    if y_low is None:
+
+    if y_low is None and reserve_ndc_bottom is None:
         if y_log:
             y_low_new = 10**(log10(y_low_new) - y_diff * 0.1)
         else:
@@ -376,7 +398,7 @@ def find_boundaries(objects, x_low=None, x_up=None, y_low=None, y_up=None, x_log
         # Can happen if fixed by user - but incompatible -
         # and at the same time log scale is requested
         get_logger().warning("Have to set y-minimum to something larger than 0 since log-scale " \
-        "is requested. Set value was %d and reset value is now %d", y_low_new, MIN_LOG_SCALE)
+        "is requested. Set value was %f and reset value is now %f", y_low_new, MIN_LOG_SCALE)
         y_low_new = MIN_LOG_SCALE
 
     if x_low_new <= 0 and x_log:
@@ -384,7 +406,7 @@ def find_boundaries(objects, x_low=None, x_up=None, y_low=None, y_up=None, x_log
         # Can happen if fixed by user - but incompatible -
         # and at the same time log scale is requested
         get_logger().warning("Have to set x-minimum to something larger than 0 since log-scale " \
-        "is requested. Set value was %d and reset value is now %d", x_low_new, MIN_LOG_SCALE)
+        "is requested. Set value was %f and reset value is now %f", x_low_new, MIN_LOG_SCALE)
         x_low_new = MIN_LOG_SCALE
 
 
@@ -404,5 +426,22 @@ def find_boundaries(objects, x_low=None, x_up=None, y_low=None, y_up=None, x_log
             else:
                 y_diff_with_legend = y_diff / (1 - reserve_ndc_top)
                 y_up_new = y_low_new + y_diff_with_legend + 0.1 * y_diff
+
+    elif reserve_ndc_bottom and not y_force_limits:
+        if y_log:
+            y_diff = log10(y_up_new) - log10(y_low_new)
+            y_diff_low_user_no_user = log10(y_low_new_no_user) - log10(y_low_new)
+        else:
+            y_diff = y_up_new - y_low_new
+            y_diff_low_user_no_user = y_low_new_no_user - y_low_new
+        if y_diff_low_user_no_user / y_diff < reserve_ndc_bottom:
+            get_logger().info("Add space to fit legend")
+            print(reserve_ndc_bottom)
+            y_diff_with_legend = y_diff / (1 - reserve_ndc_bottom)
+            if y_log:
+                y_low_new = 10**(log10(y_up_new) - y_diff_with_legend - 0.1 * y_diff)
+            else:
+                y_diff_with_legend = y_diff / (1 - reserve_ndc_bottom)
+                y_low_new = y_up_new - y_diff_with_legend - 0.1 * y_diff
 
     return x_low_new, x_up_new, y_low_new, y_up_new

@@ -8,7 +8,7 @@ from ROOT import gROOT, gDirectory, gPad, TDirectory # pylint: disable=no-name-i
 
 from hfplot.plot_spec import FigureSpec, PlotSpec
 
-from hfplot.root_helpers import clone_root, find_boundaries
+from hfplot.root_helpers import clone_root, find_boundaries, get_root_object_store
 from hfplot.utilities import map_value, try_method
 
 gROOT.SetBatch()
@@ -43,8 +43,6 @@ class ROOTPlot(PlotSpec): # pylint: disable=too-many-instance-attributes
         self.legend = None
         # labels of objects added to this ROOTPlot
         self.labels = None
-        # number of columns in the legend
-        self._legend_n_columns = 1
 
         # TPad used for the plot
         self.pad = None
@@ -54,14 +52,6 @@ class ROOTPlot(PlotSpec): # pylint: disable=too-many-instance-attributes
         # Potential PlotSpecs to share x- or y-axis with
         self._share_x = None
         self._share_y = None
-
-
-    def set_legend_columns(self, n_columns):
-        """Number of columns to be used in the legend
-
-        Args: int for number of columns
-        """
-        self._legend_n_columns = n_columns
 
 
     def __draw_objects(self):
@@ -167,48 +157,51 @@ class ROOTPlot(PlotSpec): # pylint: disable=too-many-instance-attributes
 
         """
 
-        self.axes[0].title = kwargs.pop("x_axis_title", self.axes[0].title)
-        self.axes[1].title = kwargs.pop("y_axis_title", self.axes[1].title)
+        self._axes[0].title = kwargs.pop("x_axis_title", self._axes[0].title)
+        self._axes[1].title = kwargs.pop("y_axis_title", self._axes[1].title)
         use_any_titles = kwargs.pop("use_any_titles", True)
 
+        # pylint: disable=protected-access
         if self._share_x:
-            self.axes[0].limits[0] = self._share_x.axes[0].limits[0]
-            self.axes[0].limits[1] = self._share_x.axes[0].limits[1]
+            self._axes[0].limits[0] = self._share_x._axes[0].limits[0]
+            self._axes[0].limits[1] = self._share_x._axes[0].limits[1]
 
         y_force_limits = False
         if self._share_y:
-            self.axes[1].limits[0] = self._share_y.axes[1].limits[0]
-            self.axes[1].limits[1] = self._share_y.axes[1].limits[1]
+            self._axes[1].limits[0] = self._share_y._axes[1].limits[0]
+            self._axes[1].limits[1] = self._share_y._axes[1].limits[1]
             y_force_limits = True
+        # pylint: enable=protected-access
 
         # Find the x- and y-limits for this plot
         x_low, x_up, y_low, y_up = \
-        find_boundaries(self.objects, self.axes[0].limits[0],
-        self.axes[0].limits[1], self.axes[1].limits[0],
-        self.axes[1].limits[1],
+        find_boundaries(self.objects, self._axes[0].limits[0],
+        self._axes[0].limits[1], self._axes[1].limits[0],
+        self._axes[1].limits[1],
         reserve_ndc_top=kwargs.pop("reserve_ndc_top", None),
-        y_force_limits=y_force_limits, x_log=self.axes[0].is_log, y_log=self.axes[1].is_log)
+        reserve_ndc_bottom=kwargs.pop("reserve_ndc_bottom", None),
+        y_force_limits=y_force_limits, x_log=self._axes[0].is_log, y_log=self._axes[1].is_log)
 
         # add titles to axes if not specified by the user by trying to
         # use those which are set for any ROOT object
         if use_any_titles and \
-        (not self.axes[0].title or not self.axes[1].title):
+        (not self._axes[0].title or not self._axes[1].title):
             for obj in self.objects:
-                if not self.axes[0].title and hasattr(obj, "GetXaxis"):
-                    self.axes[0].title = obj.GetXaxis().GetTitle()
-                if not self.axes[1].title and hasattr(obj, "GetYaxis"):
-                    self.axes[1].title = obj.GetYaxis().GetTitle()
-                if self.axes[0].title and self.axes[1].title:
+                if not self._axes[0].title and hasattr(obj, "GetXaxis"):
+                    self._axes[0].title = obj.GetXaxis().GetTitle()
+                if not self._axes[1].title and hasattr(obj, "GetYaxis"):
+                    self._axes[1].title = obj.GetYaxis().GetTitle()
+                if self._axes[0].title and self._axes[1].title:
                     break
 
         # Finally create the frame for this plot
-        frame_string = f";{self.axes[0].title};{self.axes[1].title}"
+        frame_string = f";{self._axes[0].title};{self._axes[1].title}"
         self.frame = self.pad.DrawFrame(x_low, y_low, x_up, y_up,
                                         frame_string)
-        self.axes[0].limits[0] = x_low
-        self.axes[0].limits[1] = x_up
-        self.axes[1].limits[0] = y_low
-        self.axes[1].limits[1] = y_up
+        self._axes[0].limits[0] = x_low
+        self._axes[0].limits[1] = x_up
+        self._axes[1].limits[0] = y_low
+        self._axes[1].limits[1] = y_up
 
         # Give the frame a unique name, for now just because we do it for
         # ROOT related object
@@ -260,7 +253,7 @@ class ROOTPlot(PlotSpec): # pylint: disable=too-many-instance-attributes
         (self._rel_coordinates[2] - self._rel_coordinates[0]))
 
 
-    def __adjust_legend_coordinates(self, *coords):
+    def __adjust_legend_coordinates(self, coords):
         """Helper method to recompute the legend coordinates properly given
         the margins
 
@@ -278,7 +271,7 @@ class ROOTPlot(PlotSpec): # pylint: disable=too-many-instance-attributes
         y_up = map_value(coords[3], 0, 1,
                           self.__adjust_row_margin(self._row_margins[0]),
                           1 - self.__adjust_row_margin(self._row_margins[1]))
-        return x_low, y_low, x_up, y_up
+        return [x_low, y_low, x_up, y_up]
 
     def __adjust_coordinate_x(self, x_in):
         return map_value(x_in, 0, 1,
@@ -305,19 +298,40 @@ class ROOTPlot(PlotSpec): # pylint: disable=too-many-instance-attributes
             return
 
         # Adjust to account for number of columns
-        n_labels = int(n_labels / self._legend_n_columns)
+        n_labels = int(n_labels / self._legend_spec.n_columns)
 
         # Get the same legend positioning relative to the axes in the plot
-        x_low, _, x_up, y_up = self.__adjust_legend_coordinates(0.5, 0.7, 1, 0.89)
-        self.legend = TLegend(x_low, y_up - 0.05 * n_labels, x_up, y_up)
-        self.legend.SetNColumns(self._legend_n_columns)
+
+        # adjust legend position starting from top right as default
+        coordinates = [0.5, 0.7, 1, 0.89]
+
+        # however, catch this one...
+        if "left" in self._legend_spec.position and "right" in self._legend_spec.position:
+            raise ValueError("Choose EITHER \"left\" OR \"right\" for legend positioning")
+        if "bottom" in self._legend_spec.position and "top" in self._legend_spec.position:
+            raise ValueError("Choose EITHER \"bottom\" OR \"top\" for legend positioning")
+
+        # and now really adjust the coordinates
+        if "left" in self._legend_spec.position:
+            coordinates[0], coordinates[2] = (0.1, 0.5)
+        if "bottom" in self._legend_spec.position:
+            coordinates[1] = 0.1
+        coordinates = self.__adjust_legend_coordinates(coordinates)
+        if "bottom" in self._legend_spec.position:
+            coordinates[3] = coordinates[1] + 0.05 * n_labels
+        else:
+            coordinates[1] = coordinates[3] - 0.05 * n_labels
+            self._legend_spec.position = self._legend_spec.position + " top"
+
+        self.legend = TLegend(*coordinates)
+        self.legend.SetNColumns(self._legend_spec.n_columns)
         # Make legend transparent and remove border
         self.legend.SetFillStyle(0)
         self.legend.SetLineWidth(0)
         # TODO this has to synced correctly with the line height of the legend which
         #      atm is 0.05 (see above)
-        self.legend.SetTextSize(self.__adjust_text_size(0.015))
         self.legend.SetTextFont(63)
+        self.legend.SetTextSize(self.__adjust_text_size(self._legend_spec.text_size))
 
         for obj, lab in zip(self.objects, self.labels):
             if lab is None:
@@ -330,10 +344,10 @@ class ROOTPlot(PlotSpec): # pylint: disable=too-many-instance-attributes
         """
 
         # recomupte tick lengths
-        self.frame.GetXaxis().SetTickLength(self.__adjust_tick_size_x(self.axes[0].tick_size))
-        self.frame.GetYaxis().SetTickLength(self.__adjust_tick_size_y(self.axes[1].tick_size))
+        self.frame.GetXaxis().SetTickLength(self.__adjust_tick_size_x(self._axes[0].tick_size))
+        self.frame.GetYaxis().SetTickLength(self.__adjust_tick_size_y(self._axes[1].tick_size))
 
-        # limit number of digits
+        # limit number of digits, TODO maybe make it configurable in the future
         self.frame.GetYaxis().SetMaxDigits(4)
 
         if self._share_x:
@@ -344,8 +358,8 @@ class ROOTPlot(PlotSpec): # pylint: disable=too-many-instance-attributes
             axis = self.frame.GetXaxis()
             axis.SetLabelFont(63)
             axis.SetTitleFont(63)
-            axis.SetTitleSize(self.__adjust_text_size(self.axes[0].title_size))
-            axis.SetLabelSize(self.__adjust_text_size(self.axes[0].label_size))
+            axis.SetTitleSize(self.__adjust_text_size(self._axes[0].title_size))
+            axis.SetLabelSize(self.__adjust_text_size(self._axes[0].label_size))
             # TODO properly compute offsets, the following is a wild guess for now
             margin = self.__adjust_row_margin(self._row_margins[0])
             axis.SetTitleOffset(19 * margin)
@@ -357,8 +371,8 @@ class ROOTPlot(PlotSpec): # pylint: disable=too-many-instance-attributes
             axis = self.frame.GetYaxis()
             axis.SetLabelFont(63)
             axis.SetTitleFont(63)
-            axis.SetTitleSize(self.__adjust_text_size(self.axes[1].title_size))
-            axis.SetLabelSize(self.__adjust_text_size(self.axes[1].label_size))
+            axis.SetTitleSize(self.__adjust_text_size(self._axes[1].title_size))
+            axis.SetLabelSize(self.__adjust_text_size(self._axes[1].label_size))
             # TODO properly compute offsets, the following is a wild guess for now
             margin = self.__adjust_column_margin(self._column_margins[0])
             axis.SetTitleOffset(23 * margin)
@@ -380,7 +394,6 @@ class ROOTPlot(PlotSpec): # pylint: disable=too-many-instance-attributes
                                  self.__adjust_coordinate_y(text.y_low + text.size),
                                  "brNDC")
             pave_box.SetLineWidth(0)
-            #pave_box.FillStyle(0)
             pave_box.AddText(text.text)
             pave_box.SetBorderSize(0)
             pave_box.SetFillStyle(0)
@@ -403,21 +416,19 @@ class ROOTPlot(PlotSpec): # pylint: disable=too-many-instance-attributes
         if not self.objects:
             return
 
+        # remember if another TPad was active before
+        prev_pad = gPad.cd() if gPad and gPad.GetName() != name else None
+
         self.name = name
         self.pad = TPad(name, "", *self._rel_coordinates)
 
         self.pad.Draw()
 
-        if self.axes[1].is_log:
+        if self._axes[1].is_log:
             self.pad.SetLogy()
-        if self.axes[0].is_log:
+        if self._axes[0].is_log:
             self.pad.SetLogx()
 
-
-
-
-        # remember if another TPad was active before
-        prev_pad = gPad.cd() if gPad else None
         # but for now change to this TPad
         self.pad.cd()
 
@@ -437,9 +448,15 @@ class ROOTPlot(PlotSpec): # pylint: disable=too-many-instance-attributes
         self.__style_objects(**kwargs)
         self.__create_legends()
 
-        if self.legend:
+        if self.legend and "top" in self._legend_spec.position:
             kwargs["reserve_ndc_top"] = \
             1 - map_value(self.legend.GetY1(),
+                          self.__adjust_row_margin(self._row_margins[0]),
+                          1 - self.__adjust_row_margin(self._row_margins[1]),
+                          0, 1)
+        elif self.legend and "bottom" in self._legend_spec.position:
+            kwargs["reserve_ndc_bottom"] = \
+            map_value(self.legend.GetY2(),
                           self.__adjust_row_margin(self._row_margins[0]),
                           1 - self.__adjust_row_margin(self._row_margins[1]),
                           0, 1)
@@ -474,6 +491,10 @@ class ROOTFigure(FigureSpec):
         # The overall canvas to plot in
         self._canvas = None
 
+        # TODO Figure out why exactly we need to cache these figures. Something seems to wrong
+        #      with the garbage collection at some point...
+        get_root_object_store().cache_any(self)
+
 
     def add_plot_spec(self, plot_spec):
         """Override method from FigureSpec
@@ -503,15 +524,19 @@ class ROOTFigure(FigureSpec):
         defined and all plots were added
         """
 
+        # remember if another TPad was active before
+        prev_pad = gPad.cd() if gPad and gPad.GetName() != self.name else None
+
         # Only now create the canvas
         self._canvas = TCanvas(self.name, "", *self.size)
 
-        # remember if another TPad was active before
-        prev_pad = gPad.cd() if gPad else None
+
+
         # but for now change to this TPad
         self._canvas.cd()
 
         for i, ps in enumerate(self._plot_specs):
+            self._canvas.cd()
             # only now create all TPads
             ps.create(f"{self.name}_pad_{i}")
 

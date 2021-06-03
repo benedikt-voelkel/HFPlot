@@ -1,7 +1,7 @@
 """Implementing plot specifications
 """
 
-from copy import copy
+from copy import deepcopy
 
 from hfplot.logger import get_logger, configure_logger
 
@@ -30,8 +30,17 @@ class AxisSpec: # pylint: disable=too-many-instance-attributes, too-few-public-m
         self.tick_size = 0.01
         self.is_log = False
 
+class LegendSpec: # pylint: disable=too-many-instance-attributes, too-few-public-methods
+    """Legend specification
+    """
+    def __init__(self):
+        self.position = "top right"
+        self.text_size = 0.015
+        self.n_columns = 1
 
-class PlotSpec: # pylint: disable=too-few-public-methods
+
+
+class PlotSpec: # pylint: disable=too-few-public-methods, too-many-instance-attributes
     """Generic plot specification
     """
     def __init__(self):
@@ -51,8 +60,11 @@ class PlotSpec: # pylint: disable=too-few-public-methods
         # text to be added to a plot
         self._texts = None
 
+        # legend properties
+        self._legend_spec = LegendSpec()
+
         # AxisSpecs of the PlotSpec
-        self.axes = [AxisSpec(), AxisSpec(), AxisSpec()]
+        self._axes = [AxisSpec(), AxisSpec(), AxisSpec()]
 
         # quickly refer to logger
         self.logger = get_logger()
@@ -65,11 +77,16 @@ class PlotSpec: # pylint: disable=too-few-public-methods
         """
         if orig is None:
             return
-        self._parent_figure_spec = orig._parent_figure_spec # pylint: disable=protected-access
-        self._rel_coordinates = orig._rel_coordinates # pylint: disable=protected-access
-        self._row_margins = orig._row_margins # pylint: disable=protected-access
-        self._column_margins = orig._column_margins # pylint: disable=protected-access
-        self._texts = orig._texts # pylint: disable=protected-access
+        # pylint: disable=protected-access
+        self._parent_figure_spec = orig._parent_figure_spec
+        self._rel_coordinates = orig._rel_coordinates
+        self._row_margins = orig._row_margins
+        self._column_margins = orig._column_margins
+        self._texts = orig._texts
+        for i, ax in enumerate(orig._axes):
+            self._axes[i] = deepcopy(ax)
+        self._legend_spec = deepcopy(orig._legend_spec)
+        # pylint: enable=protected-access
 
     def add_text(self, text, x_low, y_low, size=0.04):
         """Add a text to be added to this plot
@@ -83,6 +100,35 @@ class PlotSpec: # pylint: disable=too-few-public-methods
             self._texts = []
 
         self._texts.append(TextSpec(text, x_low, y_low, size))
+
+    def axes(self, *args, **kwargs):
+        """set axis properties
+
+        Args:
+            args: tuple of axes, either left out to apply to all axes or specify e.g. "x", "y"
+            kwargs: dict, key-value where key can be any axis attribute set to value
+        """
+        which_axes = [0, 1, 2]
+        if args:
+            # remove unrequested axes
+            if "x" not in args:
+                which_axes.remove(0)
+            if "y" not in args:
+                which_axes.remove(1)
+            if "z" not in args:
+                which_axes.remove(2)
+
+        for k, v in kwargs.items():
+            # Apparently, does not work simply with class, potentially since attributes are only
+            # added in __init__. Therefore, use one object instead
+            if not hasattr(self._axes[0], k):
+                get_logger().warning("Unknown attribute %s of AxisSpec", k)
+                continue
+            for i, ax in enumerate(self._axes):
+                if i not in which_axes:
+                    # only apply to requested
+                    continue
+                setattr(ax, k, v)
 
 
 class FigureSpec: # pylint: disable=too-many-instance-attributes
@@ -133,6 +179,9 @@ class FigureSpec: # pylint: disable=too-many-instance-attributes
 
         # default axes settings
         self._default_axes = [AxisSpec(), AxisSpec(), AxisSpec()]
+
+        # default legend settings
+        self._default_legend = LegendSpec()
 
         # quickly refer to logger
         self.logger = get_logger()
@@ -278,8 +327,10 @@ class FigureSpec: # pylint: disable=too-many-instance-attributes
                 self.__add_cell(cell_current + j)
 
     def __set_defaults_for_plot_spec(self, plot_spec):
-        for i, ax enumerate(self._default_axes):
-            plot_spec.axes[i] = copy(ax)
+        for i, ax in enumerate(self._default_axes):
+            plot_spec._axes[i] = deepcopy(ax) # pylint: disable=protected-access
+
+        plot_spec._legend_spec = deepcopy(self._default_legend) # pylint: disable=protected-access
 
     def __make_plot_spec(self, col_low, row_low, col_up, row_up):
         """Compute properties and create a PlotSpec from cells the user wants
@@ -344,14 +395,16 @@ class FigureSpec: # pylint: disable=too-many-instance-attributes
     def consume_plot_kwargs(self, **kwargs):
         """Forward keyword arguments for plot
         """
-        self._current_plot_spec.axes[0].is_log = \
-        kwargs.pop("x_log", self._current_plot_spec.axes[0].is_log) # pylint: disable=protected-access
-        self._current_plot_spec.axes[1].is_log = \
-        kwargs.pop("y_log", self._current_plot_spec.axes[1].is_log) # pylint: disable=protected-access
-        self._current_plot_spec.axes[2].is_log = \
-        kwargs.pop("z_log", self._current_plot_spec.axes[2].is_log) # pylint: disable=protected-access
-        self._current_plot_spec._share_x = kwargs.pop("share_x", None) # pylint: disable=protected-access
-        self._current_plot_spec._share_y = kwargs.pop("share_y", None) # pylint: disable=protected-access
+        # pylint: disable=protected-access, protected-access
+        self._current_plot_spec._axes[0].is_log = \
+        kwargs.pop("x_log", self._current_plot_spec._axes[0].is_log)
+        self._current_plot_spec._axes[1].is_log = \
+        kwargs.pop("y_log", self._current_plot_spec._axes[1].is_log)
+        self._current_plot_spec._axes[2].is_log = \
+        kwargs.pop("z_log", self._current_plot_spec._axes[2].is_log)
+        self._current_plot_spec._share_x = kwargs.pop("share_x", None)
+        self._current_plot_spec._share_y = kwargs.pop("share_y", None)
+        # pylint: enable=protected-access, protected-access
 
 
     def define_plot(self, *cols_rows, **kwargs):
@@ -373,7 +426,11 @@ class FigureSpec: # pylint: disable=too-many-instance-attributes
 
         if not cols_rows:
             # just find the next free cell
-            cell = list((set(range(self.n_cols * self.n_rows)) - set(self.cells_taken)))[0]
+            cell = list((set(range(self.n_cols * self.n_rows)) - set(self.cells_taken)))
+            # sort because the difference puts the last number at the from when it reaches
+            # more than 50% of cells taken
+            cell.sort()
+            cell = cell[0]
             col_low = cell % self.n_cols
             row_low = int(cell / self.n_cols)
             col_up = col_low
@@ -443,16 +500,44 @@ class FigureSpec: # pylint: disable=too-many-instance-attributes
         self._current_plot_spec.add_text(text, x_low, y_low, size)
 
 
-    def axis_label_size(self, size):
-        for ax in self._default_axes:
-            ax.label_size = size
-        for ps in self._plot_specs:
-            for ax in ps.axes:
-                ax.label_size = size
+    def axes(self, *args, **kwargs):
+        """set axis properties
 
-    def axis_title_size(self, size):
-        for ax in self._default_axes:
-            ax.title_size = size
-        for ps in self._plot_specs:
-            for ax in ps.axes:
-                ax.title_size = size
+        Args:
+            args: tuple of axes, either left out to apply to all axes or specify e.g. "x", "y"
+            kwargs: dict, key-value where key can be any axis attribute set to value
+        """
+        which_axes = [0, 1, 2]
+        if args:
+            # remove unrequested axes
+            if "x" not in args:
+                which_axes.remove(0)
+            if "y" not in args:
+                which_axes.remove(1)
+            if "z" not in args:
+                which_axes.remove(2)
+
+
+        for k, v in kwargs.items():
+            # Apparently, does not work simply with class, potentially since attributes are only
+            # added in __init__. Therefore, use one object instead
+            if not hasattr(self._default_axes[0], k):
+                get_logger().warning("Unknown attribute %s of AxisSpec", k)
+                continue
+
+            for i, ax in enumerate(self._default_axes):
+                if i not in which_axes:
+                    # only apply to requested
+                    continue
+                setattr(ax, k, v)
+            for ps in self._plot_specs:
+                ps.axes(*args, k=v)
+
+
+    def legend(self, **kwargs):
+        """set legend properties
+        """
+        # TODO make flexible in the way axes properties are changed
+        self._default_legend.text_size = kwargs.pop("text_size", self._default_legend.text_size)
+        self._default_legend.position = kwargs.pop("position", self._default_legend.position)
+        self._default_legend.n_columns = kwargs.pop("n_columns", self._default_legend.n_columns)
