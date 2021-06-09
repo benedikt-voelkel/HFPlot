@@ -158,6 +158,8 @@ def find_boundaries_TH1(histo, x_low=None, x_up=None, y_low=None, y_up=None,
         # go bin by bin and take y-errors into account
         y_low = histo.GetBinContent(start_bin) - histo.GetBinError(start_bin)
         for i in range(start_bin, end_bin + 1):
+            if not histo.GetBinContent(i):
+                continue
             min_tmp = histo.GetBinContent(i) - histo.GetBinError(i)
             if min_tmp <= 0 and y_log:
                 continue
@@ -167,6 +169,8 @@ def find_boundaries_TH1(histo, x_low=None, x_up=None, y_low=None, y_up=None,
         # go bin by bin and take y-errors into account
         y_up = histo.GetBinContent(start_bin) + histo.GetBinError(start_bin)
         for i in range(start_bin, end_bin + 1):
+            if not histo.GetBinContent(i):
+                continue
             max_tmp = histo.GetBinContent(i) + histo.GetBinError(i)
             y_up = max(max_tmp, y_up)
 
