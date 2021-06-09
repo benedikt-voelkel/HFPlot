@@ -67,6 +67,10 @@ class PlotSpec: # pylint: disable=too-few-public-methods, too-many-instance-attr
         # AxisSpecs of the PlotSpec
         self._axes = [AxisSpec(), AxisSpec(), AxisSpec()]
 
+        # Potential PlotSpecs to share x- or y-axis with
+        self._share_x = None
+        self._share_y = None
+
         # quickly refer to logger
         self.logger = get_logger()
 
@@ -87,6 +91,8 @@ class PlotSpec: # pylint: disable=too-few-public-methods, too-many-instance-attr
         for i, ax in enumerate(orig._axes):
             self._axes[i] = deepcopy(ax)
         self._legend_spec = deepcopy(orig._legend_spec)
+        self._share_x = orig._share_x
+        self._share_y = orig._share_y
         # pylint: enable=protected-access
 
     def add_text(self, text, x_low, y_low, size=0.04):
@@ -120,7 +126,6 @@ class PlotSpec: # pylint: disable=too-few-public-methods, too-many-instance-attr
                 which_axes.remove(2)
 
         for k, v in kwargs.items():
-            print(args, k)
             # Apparently, does not work simply with class, potentially since attributes are only
             # added in __init__. Therefore, use one object instead
             if not hasattr(self._axes[0], k):

@@ -49,10 +49,6 @@ class ROOTPlot(PlotSpec): # pylint: disable=too-many-instance-attributes
         # TODO: use PlotSpec's relative coordinates
         self.size = (300, 300)
 
-        # Potential PlotSpecs to share x- or y-axis with
-        self._share_x = None
-        self._share_y = None
-
 
     def __draw_objects(self):
         """Draw all objects
@@ -162,9 +158,11 @@ class ROOTPlot(PlotSpec): # pylint: disable=too-many-instance-attributes
         use_any_titles = kwargs.pop("use_any_titles", True)
 
         # pylint: disable=protected-access
+        x_force_limits = False
         if self._share_x:
             self._axes[0].limits[0] = self._share_x._axes[0].limits[0]
             self._axes[0].limits[1] = self._share_x._axes[0].limits[1]
+            x_force_limits = True
 
         y_force_limits = False
         if self._share_y:
@@ -179,7 +177,7 @@ class ROOTPlot(PlotSpec): # pylint: disable=too-many-instance-attributes
         self._axes[0].limits[1], self._axes[1].limits[0],
         self._axes[1].limits[1],
         reserve_ndc_top=kwargs.pop("reserve_ndc_top", None),
-        reserve_ndc_bottom=kwargs.pop("reserve_ndc_bottom", None),
+        reserve_ndc_bottom=kwargs.pop("reserve_ndc_bottom", None), x_force_limits=x_force_limits,
         y_force_limits=y_force_limits, x_log=self._axes[0].is_log, y_log=self._axes[1].is_log)
 
         # add titles to axes if not specified by the user by trying to

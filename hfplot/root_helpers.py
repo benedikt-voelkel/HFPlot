@@ -107,6 +107,21 @@ def clone_root(root_object, proposed_name=None, detach=True):
         detach_from_root_directory(obj)
     return obj
 
+def strip_front(hist, n_bins=1):
+    hist_clone = clone_root(hist)
+    for i in range(n_bins):
+        hist_clone.SetBinContent(i + 1, 0)
+        hist_clone.SetBinError(i + 1, 0)
+    return hist_clone
+
+def strip_back(hist, n_bins=1):
+    hist_clone = clone_root(hist)
+    for i in range(hist_clone.GetNbinsX() - n_bins, hist_clone.GetNbinsX()):
+        hist_clone.SetBinContent(i + 1, 0)
+        hist_clone.SetBinError(i + 1, 0)
+    return hist_clone
+
+
 
 def find_boundaries_TH1(histo, x_low=None, x_up=None, y_low=None, y_up=None,
                         x_log=False, y_log=False): # pylint: disable=unused-argument, invalid-name
@@ -263,7 +278,7 @@ def find_boundaries_TGraph(graph, x_low=None, x_up=None, y_low=None, y_up=None,
 
 def find_boundaries(objects, x_low=None, x_up=None, y_low=None, y_up=None, x_log=False, # pylint: disable=unused-argument, too-many-branches, too-many-statements
                     y_log=False, reserve_ndc_top=None, reserve_ndc_bottom=None,
-                    y_force_limits=False):
+                    x_force_limits=False, y_force_limits=False):
     """Find boundaries for any ROOT objects
 
     Args:
@@ -399,6 +414,11 @@ def find_boundaries(objects, x_low=None, x_up=None, y_low=None, y_up=None, x_log
             y_up_new = 10**(log10(y_up_new) + y_diff * 0.1)
         else:
             y_up_new += 0.1 * y_diff
+
+    # Now force the limits if requested
+    if x_force_limits and x_low is not None and x_up is not None:
+        x_low_new = x_low
+        x_up_new = x_up
 
     if y_force_limits and y_low is not None and y_up is not None:
         y_low_new = y_low
