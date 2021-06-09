@@ -120,6 +120,7 @@ class PlotSpec: # pylint: disable=too-few-public-methods, too-many-instance-attr
                 which_axes.remove(2)
 
         for k, v in kwargs.items():
+            print(args, k)
             # Apparently, does not work simply with class, potentially since attributes are only
             # added in __init__. Therefore, use one object instead
             if not hasattr(self._axes[0], k):
@@ -540,8 +541,8 @@ class FigureSpec: # pylint: disable=too-many-instance-attributes
                     # only apply to requested
                     continue
                 setattr(ax, k, v)
-            for ps in self._plot_specs:
-                ps.axes(*args, k=v)
+        if self._current_plot_spec:
+            self._current_plot_spec.axes(*args, **kwargs)
 
 
     def legend(self, **kwargs):
@@ -552,5 +553,5 @@ class FigureSpec: # pylint: disable=too-many-instance-attributes
                 get_logger().warning("Unknown attribute %s of LegendSpec", k)
                 continue
             setattr(self._default_legend, k, v)
-            for ps in self._plot_specs:
-                ps.legend(k=v)
+        if self._current_plot_spec:
+            self._current_plot_spec.legend(**kwargs)
