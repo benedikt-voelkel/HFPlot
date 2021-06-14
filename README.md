@@ -77,6 +77,29 @@ As seen above, this call return the `PlotSpec` object which was just created. Ho
 
 Now comes the fun part, actually plotting something. As mentioned, there is only `ROOT` available as a backend currently. So let's proceed in the next section.
 
+### Axes and legend customisation
+
+The axes can be customised as follows
+```python
+figure.axes(title="legend title") # changes the title of all axes for all plots
+
+figure.axes("x", label_offset=4.5) # changes the label offset of all x-axes
+
+plot = figure.define_plot()
+plot.axes("y", title="y-axis") # changes the y-axis title of a specific plot
+```
+
+Changing legend properties works very similar
+```python
+figure.legend(n_columns=2) # changes number of legend columns to 2 for all plots
+
+plot = figure.define_plot()
+plot.legend(position="top left") # changes the legend position to top-right
+plot.legend(position=(0.5, 0.7, 0.8, 0.9)) # changes the legend position according to how ROOT does it
+
+```
+
+
 
 ### How `ROOT` is wrapped here
 
