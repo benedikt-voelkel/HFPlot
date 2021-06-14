@@ -4,7 +4,7 @@ from os import getpid
 from ROOT import TRandom, TGraph, TH1F, TF1, kBlack
 
 from hfplot.plot_helpers import make_grid
-from hfplot.style import generate_styles, ROOTStyle1D
+from hfplot.style import generate_styles, MarkerStyle, StyleObject1D
 
 
 ##########################################
@@ -37,10 +37,10 @@ func = TF1("func","84*sin(x)*sin(x)/x", 1, 10)
 ###################################
 
 # Generate 5 styles, keep markerstyle the same for all
-styles = generate_styles(5, markerstyles=[34])
-styles_graphs = generate_styles(5, markerstyles=[21], draw_options=["P"])
+styles = generate_styles(StyleObject1D, 5, markerstyle=34)
+styles_graphs = generate_styles(StyleObject1D, 5, markerstyle=21, draw_options=["P"])
 # make explicity style for the function
-func_style = ROOTStyle1D()
+func_style = StyleObject1D()
 func_style.linecolor = kBlack
 
 # number of columns and rows

@@ -35,7 +35,7 @@ h_ratio.Divide(hist_2)
 ###################################
 
 # Generate 2 styles with constant markerstyle
-styles = generate_styles(2, markerstyles=[34], markersizes=[2])
+styles = generate_styles(2, markerstyles=34, markersizes=2)
 
 # Create a figure with one cell (1 column and one row)
 figure = ROOTFigure(1, 2, size=(400, 600), row_margin=[(0.1, 0), (0, 0.1)], column_margin=0.1, height_ratios=[1, 2])

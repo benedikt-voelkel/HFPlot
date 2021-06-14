@@ -3,7 +3,7 @@
 
 from math import sqrt
 
-from ROOT import TCanvas, TLegend, TPad, TPaveText # pylint: disable=no-name-in-module
+from ROOT import TCanvas, TLegend, TPad, TPaveText, TLine # pylint: disable=no-name-in-module
 from ROOT import gROOT, gDirectory, gPad, TDirectory # pylint: disable=no-name-in-module
 
 from hfplot.plot_spec import FigureSpec, PlotSpec
@@ -40,9 +40,12 @@ class ROOTPlot(PlotSpec): # pylint: disable=too-many-instance-attributes
         self.pave_boxes = None
 
         # legend
-        self.legend = None
+        self.root_legend = None
         # labels of objects added to this ROOTPlot
         self.labels = None
+
+        # lines added
+        self._root_lines = []
 
         # TPad used for the plot
         self.pad = None
@@ -59,16 +62,72 @@ class ROOTPlot(PlotSpec): # pylint: disable=too-many-instance-attributes
             draw_option = "same" if not sty else f"same {sty.draw_options}"
             obj.Draw(draw_option)
 
+    def __apply_line_style(self, root_object, style):
+        """Apply line style
+        """
+        # TODO Maybe check if derives from TAttLine
+        # TODO Could become static
+        if style.linestyle is not None:
+            root_object.SetLineStyle(style.linestyle)
+        if style.linewidth is not None:
+            root_object.SetLineWidth(style.linewidth)
+        if style.linecolor is not None:
+            root_object.SetLineColor(style.linecolor)
+
+    def __apply_marker_style(self, root_object, style):
+        """Apply marker style
+        """
+        # TODO Maybe check if derives from TAttMarker
+        # TODO Could become static
+        if style.markersize is not None:
+            root_object.SetMarkerSize(style.markersize)
+        if style.markerstyle is not None:
+            root_object.SetMarkerStyle(style.markerstyle)
+        if style.markercolor is not None:
+            root_object.SetMarkerColor(style.markercolor)
+
+    def __apply_fill_style(self, root_object, style):
+        """Apply fill style
+        """
+        # TODO Maybe check if derives from TAttFill
+        # TODO Could become static
+        if style.fillstyle is not None:
+            root_object.SetFillStyle(style.fillstyle)
+        if style.fillcolor is not None:
+            root_object.SetFillColor(style.fillcolor)
+        if style.fillalpha is not None and style.fillcolor is not None and style.fillalpha < 1.:
+            root_object.SetFillColorAlpha(style.fillcolor, style.fillalpha)
+
+    def __draw_lines(self):
+        """Draw all lines
+        """
+        for l in self._lines:
+            x_low = l.x_low
+            x_up = l.x_up
+            if l.x_orientation == "relative":
+                x_range = self._axes[0].limits[1] - self._axes[0].limits[0]
+                x_low = self._axes[0].limits[0] + l.x_low * x_range
+                x_up = self._axes[0].limits[0] + l.x_up * x_range
+            y_low = l.y_low
+            y_up = l.y_up
+            if l.y_orientation == "relative":
+                y_range = self._axes[1].limits[1] - self._axes[1].limits[0]
+                y_low = self._axes[1].limits[0] + l.y_low * x_range
+                y_up = self._axes[1].limits[0] + l.y_up * x_range
+            line = TLine(x_low, y_low, x_up, y_up)
+            self.__apply_line_style(line, l.style)
+            line.Draw()
+            self._root_lines.append(line)
+
 
     def __draw_legends(self):
         """Encapsulate legend drawing
         """
-        if self.legend:
-            self.legend.Draw()
+        if self.root_legend:
+            self.root_legend.Draw()
 
 
-    @staticmethod
-    def __style_object(obj, style, scale=1):
+    def __style_object(self, obj, style, scale=1):
         """Style one object
 
         Args:
@@ -81,24 +140,10 @@ class ROOTPlot(PlotSpec): # pylint: disable=too-many-instance-attributes
             return
         # call one style method of the object after the other
         # TODO might need to be specific for certain ROOT classes
-        if style.linewidth is not None:
-            obj.SetLineWidth(style.linewidth)
-        if style.linestyle is not None:
-            obj.SetLineStyle(style.linestyle)
-        if style.linecolor is not None:
-            obj.SetLineColor(style.linecolor)
-        if style.markersize is not None:
-            obj.SetMarkerSize(style.markersize * scale)
-        if style.markerstyle is not None:
-            obj.SetMarkerStyle(style.markerstyle)
-        if style.markercolor is not None:
-            obj.SetMarkerColor(style.markercolor)
-        if style.fillstyle is not None:
-            obj.SetFillStyle(style.fillstyle)
-        if style.fillcolor is not None:
-            obj.SetFillColor(style.fillcolor)
-        if style.fillalpha is not None and style.fillcolor is not None and style.fillalpha < 1.:
-            obj.SetFillColorAlpha(style.fillcolor, style.fillalpha)
+        self.__apply_line_style(obj, style)
+        self.__apply_marker_style(obj, style)
+        self.__apply_fill_style(obj, style)
+
 
     def __style_objects(self, **kwargs):
         """Style all objects to be plotted
@@ -108,6 +153,7 @@ class ROOTPlot(PlotSpec): # pylint: disable=too-many-instance-attributes
                 "keep_stats" to keep potential stats boxes associated with
                 e.g. histograms
         """
+        # TODO Make that static again
         keep_stats = kwargs.pop("keep_stats", False)
         scale = sqrt(self.size[0] * self.size[1] / SCALE_BASE)
         for obj, style in zip(self.objects, self.styles):
@@ -152,7 +198,6 @@ class ROOTPlot(PlotSpec): # pylint: disable=too-many-instance-attributes
                                 the user
 
         """
-
         self._axes[0].title = kwargs.pop("x_axis_title", self._axes[0].title)
         self._axes[1].title = kwargs.pop("y_axis_title", self._axes[1].title)
         use_any_titles = kwargs.pop("use_any_titles", True)
@@ -333,20 +378,20 @@ class ROOTPlot(PlotSpec): # pylint: disable=too-many-instance-attributes
         else:
             coordinates[1] = coordinates[3] - 0.05 * n_labels
 
-        self.legend = TLegend(*coordinates)
-        self.legend.SetNColumns(self._legend_spec.n_columns)
+        self.root_legend = TLegend(*coordinates)
+        self.root_legend.SetNColumns(self._legend_spec.n_columns)
         # Make legend transparent and remove border
-        self.legend.SetFillStyle(0)
-        self.legend.SetLineWidth(0)
+        self.root_legend.SetFillStyle(0)
+        self.root_legend.SetLineWidth(0)
         # TODO this has to synced correctly with the line height of the legend which
         #      atm is 0.05 (see above)
-        self.legend.SetTextFont(63)
-        self.legend.SetTextSize(self.__adjust_text_size(self._legend_spec.text_size))
+        self.root_legend.SetTextFont(63)
+        self.root_legend.SetTextSize(self.__adjust_text_size(self._legend_spec.text_size))
 
         for obj, lab in zip(self.objects, self.labels):
             if lab is None:
                 continue
-            self.legend.AddEntry(obj, lab)
+            self.root_legend.AddEntry(obj, lab)
 
 
     def __style_frame(self):
@@ -462,15 +507,15 @@ class ROOTPlot(PlotSpec): # pylint: disable=too-many-instance-attributes
         self.__style_objects(**kwargs)
         self.__create_legends()
 
-        if self.legend and self._legend_spec.principal_position == "top":
+        if self.root_legend and self._legend_spec.principal_position == "top":
             kwargs["reserve_ndc_top"] = \
-            1 - map_value(self.legend.GetY1(),
+            1 - map_value(self.root_legend.GetY1(),
                           self.__adjust_row_margin(self._row_margins[0]),
                           1 - self.__adjust_row_margin(self._row_margins[1]),
                           0, 1)
-        elif self.legend and self._legend_spec.principal_position == "bottom":
+        elif self.root_legend and self._legend_spec.principal_position == "bottom":
             kwargs["reserve_ndc_bottom"] = \
-            map_value(self.legend.GetY2(),
+            map_value(self.root_legend.GetY2(),
                           self.__adjust_row_margin(self._row_margins[0]),
                           1 - self.__adjust_row_margin(self._row_margins[1]),
                           0, 1)
@@ -482,6 +527,7 @@ class ROOTPlot(PlotSpec): # pylint: disable=too-many-instance-attributes
 
         # draw objects and legends
         self.__draw_objects()
+        self.__draw_lines()
         self.__draw_legends()
         self.__draw_text()
 

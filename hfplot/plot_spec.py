@@ -39,6 +39,17 @@ class LegendSpec: # pylint: disable=too-many-instance-attributes, too-few-public
         self.n_columns = 1
         self.principal_position = None
 
+class LineSpec:
+    """Line specification
+    """
+    def __init__(self, x_low, x_up, y_low, y_up, x_orientation="relative", y_orientation="relative"):
+        self.x_low = x_low
+        self.x_up = x_up
+        self.y_low = y_low
+        self.y_up = y_up
+        self.x_orientation = x_orientation
+        self.y_orientation = y_orientation
+        self.style = LineStyle()
 
 
 class PlotSpec: # pylint: disable=too-few-public-methods, too-many-instance-attributes
@@ -59,13 +70,16 @@ class PlotSpec: # pylint: disable=too-few-public-methods, too-many-instance-attr
         self._column_margins = None
 
         # text to be added to a plot
-        self._texts = None
+        self._texts = []
 
         # legend properties
         self._legend_spec = LegendSpec()
 
         # AxisSpecs of the PlotSpec
         self._axes = [AxisSpec(), AxisSpec(), AxisSpec()]
+
+        # LineSpecs
+        self._lines = []
 
         # Potential PlotSpecs to share x- or y-axis with
         self._share_x = None
@@ -103,10 +117,34 @@ class PlotSpec: # pylint: disable=too-few-public-methods, too-many-instance-attr
             x_low: relative low horizontal coordinate
             y_low: relative vertical coordinate
         """
-        if self._texts is None:
-            self._texts = []
-
         self._texts.append(TextSpec(text, x_low, y_low, size))
+
+    def add_line(self, x_low=None, x_up=None, y_low=None, y_up=None, x_orientation="relative", y_orientation="relative"):
+        """Add a text to be added to this plot
+
+        Args:
+            text: str to be printed
+            x_low: relative low horizontal coordinate
+            y_low: relative vertical coordinate
+        """
+        if x_low is None and x_up is None:
+            x_low = 0
+            x_up = 1
+        elif x_low is None and x_up is not None:
+            x_low = x_up
+        elif x_up is None and x_low is not None:
+            x_up = x_low
+
+        if y_low is None and y_up is None:
+            y_low = 0
+            y_up = 1
+        elif y_low is None and y_up is not None:
+            y_low = y_up
+        elif y_up is None and y_low is not None:
+            y_up = y_low
+
+        self._lines.append(LineSpec(x_low, x_up, y_low, y_up, x_orientation, y_orientation))
+
 
     def axes(self, *args, **kwargs):
         """set axis properties
@@ -514,6 +552,21 @@ class FigureSpec: # pylint: disable=too-many-instance-attributes
             self.logger.warning("No current plot to add text")
             return
         self._current_plot_spec.add_text(text, x_low, y_low, size)
+
+    def add_line(self, x_low=None, x_up=None, y_low=None, y_up=None, x_orientation="relative", y_orientation="relative"):
+        """Add a text to be added to the current plot
+
+        Args:
+            text: str to be printed
+            x_low: relative low horizontal coordinate
+            x_up: relative upper horizontal coordinate
+            y_low: relative low vertical coordinate
+            y_up: relative upper vertical coordinate
+        """
+        if not self._current_plot_spec:
+            self.logger.warning("No current plot to add line")
+            return
+        self._current_plot_spec.add_line(x_low, x_up, y_low, y_up, x_orientation, y_orientation)
 
 
     def axes(self, *args, **kwargs):

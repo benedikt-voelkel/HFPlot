@@ -28,25 +28,64 @@ FILLALPHA_DEFAULTS = [1]
 DRAW_OPTIONS_DEFAULTS = [""]
 
 
-class ROOTStyle1D: # pylint: disable=too-many-instance-attributes, too-few-public-methods
-    """Summarising style attributes for 1D ROOT objects
+def generate_styles(style_class, n_styles=1, **kwargs):
+    # Generate number of requested styles
+    styles = [style_class() for _ in range(n_styles)]
+    # Get the defaults of this class
+    defaults = style_class.defaults
 
-    TODO This needs to be revised at some point
-    """
+    for k in defaults:
+        # Overwrite defaults by potential user input
+        defaults[k] = kwargs.pop(k, defaults[k])
+
+    for k, v in defaults.items():
+        # Go through all style options
+        for i, style in enumerate(styles):
+            if not hasattr(style, k):
+                get_logger().warning("Unknown attribute %s of style class %s", k, style_class.__name__)
+                continue
+            try:
+                # Option might come as an iterable
+                iter(v)
+                chosen_style = v[i%len(v)]
+            except TypeError:
+                # if not, this is assumed to be the option
+                chosen_style = v
+            # now apply the option
+            setattr(style, k, chosen_style)
+    return styles
+
+class LineStyle:
+    defaults = {"linewidth": [2],
+                "linestyle": [1, 7, 10],
+                "linecolor": copy(COLOR_DEFAULTS)}
     def __init__(self):
         self.linewidth = None
         self.linestyle = None
         self.linecolor = None
 
+
+class MarkerStyle:
+    defaults = {"markersize": [1],
+                "markerstyle": [20, 21, 22, 23, 34],
+                "markercolor": copy(COLOR_DEFAULTS)}
+    def __init__(self):
         self.markersize = None
         self.markerstyle = None
         self.markercolor = None
 
+
+class FillStyle:
+    # matplotlibify
+    # https://root.cern.ch/doc/master/TAttFill_8h_source.html#l00039
+    FILLSTYLES_DICT = {"empty": 0, "solid": 1, "dotted": 3001, "hatched": 3004}
+    defaults = {"fillstyle": [FILLSTYLES_DICT["empty"]],
+                "fillcolor": copy(COLOR_DEFAULTS),
+                "fillalpha": [1]}
+    def __init__(self):
         self._fillstyle = None
         self.fillcolor = None
         self.fillalpha = None
-
-        self.draw_options = None
 
 
     @property
@@ -64,57 +103,26 @@ class ROOTStyle1D: # pylint: disable=too-many-instance-attributes, too-few-publi
             return
         self._fillstyle = value
 
-def generate_styles_1d(n_styles, **kwargs):
-    """generate styles for 1D ROOT objects
+class StyleObject1D(LineStyle, MarkerStyle, FillStyle): # pylint: disable=too-many-instance-attributes, too-few-public-methods
+    """Summarising style attributes for 1D ROOT objects
 
-    Args:
-        n_styles: int number of styles to be generated
-        kwargs: dict used to fix certain attributes by the user
+    TODO This needs to be revised at some point
     """
-
-    styles = []
-
-    linewidths = kwargs.pop("linewidths", LINEWIDTH_DEFAULTS)
-    linestyles = kwargs.pop("linestyles", LINESTYLE_DEFAULTS)
-    linecolors = kwargs.pop("linecolors", LINECOLOR_DEFAULTS)
-
-    markersizes = kwargs.pop("markersizes", MARKERSIZE_DEFAULTS)
-    markerstyles = kwargs.pop("markerstyles", MARKERSTYLE_DEFAULTS)
-    markercolors = kwargs.pop("markercolors", MARKERCOLOR_DEFAULTS)
-
-    fillstyles = kwargs.pop("fillstyles", FILLSTYLE_DEFAULTS)
-    fillcolors = kwargs.pop("fillcolors", FILLCOLOR_DEFAULTS)
-    fillalphas = kwargs.pop("fillalpha", FILLALPHA_DEFAULTS)
-
-    draw_options = kwargs.pop("draw_options", DRAW_OPTIONS_DEFAULTS)
-
-    for i in range(n_styles):
-        new_style = ROOTStyle1D()
-        new_style.linewidth = linewidths[i % len(linewidths)]
-        new_style.linestyle = linestyles[i % len(linestyles)]
-        new_style.linecolor = linecolors[i % len(linecolors)]
-        new_style.markersize = markersizes[i % len(markersizes)]
-        new_style.markerstyle = markerstyles[i % len(markerstyles)]
-        new_style.markercolor = markercolors[i % len(markercolors)]
-        new_style.fillstyle = fillstyles[i % len(fillstyles)]
-        new_style.fillcolor = fillcolors[i % len(fillcolors)]
-        new_style.fillalpha = fillalphas[i % len(fillalphas)]
-        new_style.draw_options = draw_options[i % len(draw_options)]
-        styles.append(new_style)
-    return styles
-
-
-def generate_styles(n_styles, **kwargs):
-    """generate styles for 1D ROOT objects
-
-    Args:
-        n_styles: int number of styles to be generated
-        kwargs: dict used to fix certain attributes by the user
-    """
-
-    dim = kwargs.pop("dim", 1)
-
-    if dim == 1:
-        return generate_styles_1d(n_styles, **kwargs)
-    get_logger().warning("Styles are only supported for 1d and 2d objects")
-    return [None] * n_styles
+    # Compund defaults
+    defaults = {"linewidth": [2],
+                "linestyle": [1, 7, 10],
+                "linecolor": copy(COLOR_DEFAULTS),
+                "markersize": [1],
+                "markerstyle": [20, 21, 22, 23, 34],
+                "markercolor": copy(COLOR_DEFAULTS),
+                "fillstyle": [FILLSTYLES_DICT["empty"]],
+                "fillcolor": copy(COLOR_DEFAULTS),
+                "fillalpha": [1]}
+    def __init__(self):
+        LineStyle.__init__(self)
+        MarkerStyle.__init__(self)
+        FillStyle.__init__(self)
+        # self.linestyle = None
+        # self.markerstyle = None
+        # self.fillstyle = None
+        self.draw_options = None

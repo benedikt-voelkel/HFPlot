@@ -3,6 +3,27 @@
 
 from hfplot.plot_spec_root import ROOTFigure
 
+def make_equal_plot_sizes(margins, height_ratios=None):
+    """Make plots modulo axes and margins equal size
+
+    Args:
+        margins: iterable of 2-tuples (margin1, margin2)
+    Returns:
+        list of plot size ratios
+    """
+
+    n = len(margins)
+
+    if not height_ratios:
+        height_ratios = [1] * n
+
+    if n != len(height_ratios):
+        raise ValueError(f"Need as many height ratios as margin tuples, {len(height_ratios)} vs. {n}")
+    # TODO That is not quite true yet
+    sum_heights = sum(height_ratios)
+    return [h + (m[0] + m[1]) * (sum_heights) for m, h in zip(margins, height_ratios)]
+
+
 
 def make_grid(n_cols_rows, margin_left, margin_bottom, margin_right=0.05,
               margin_top=0.05, figure_class=ROOTFigure, **kwargs):
@@ -32,25 +53,14 @@ def make_grid(n_cols_rows, margin_left, margin_bottom, margin_right=0.05,
         n_rows = n_cols_rows
         n_cols = n_cols_rows
 
-    # For only one plot
-    plot_width = (1 - (margin_left + margin_right)) / n_cols
-    plot_height = (1 - (margin_top + margin_bottom)) / n_rows
-
-    width_ratios = [plot_width] * n_cols
-    height_ratios = [plot_height] * n_rows
-
-    width_ratios[0] = plot_width + margin_left
-    width_ratios[-1] = plot_width + margin_right
-
-    height_ratios[0] = plot_height + margin_bottom
-    height_ratios[-1] = plot_height + margin_top
-
-
     column_margin = [(margin_left, 0)] + [(0, 0)] * (n_cols - 1)
     row_margin = [(margin_bottom, 0)] + [(0, 0)] * (n_rows - 1)
 
     column_margin[-1] = (column_margin[-1][0], margin_right)
     row_margin[-1] = (row_margin[-1][0], margin_top)
+
+    width_ratios = make_equal_plot_sizes(column_margin)
+    height_ratios = make_equal_plot_sizes(row_margin)
 
     figure = figure_class(n_cols, n_rows, height_ratios=height_ratios, width_ratios=width_ratios,
                       column_margin=column_margin, row_margin=row_margin, size=size)
@@ -65,8 +75,8 @@ def make_grid(n_cols_rows, margin_left, margin_bottom, margin_right=0.05,
             if j == 0:
                 share_y = None
             plot = figure.define_plot(j, i, share_x=share_x, share_y=share_y)
-            plot.axes[0].title = x_title
-            plot.axes[1].title = y_title
+            plot.axes("x", title=x_title)
+            plot.axes("y", title=y_title)
             if i == 0:
                 share_x = plot
             if j == 0:

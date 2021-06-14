@@ -4,7 +4,7 @@ from os import getpid
 from ROOT import TRandom, TH1F
 
 from hfplot.plot_helpers import make_grid
-from hfplot.style import generate_styles, ROOTStyle1D
+from hfplot.style import generate_styles, StyleObject1D, MarkerStyle
 from hfplot.plot_spec_root import ROOTFigure
 
 
@@ -31,7 +31,7 @@ for i in range(len(bin_edges) + 1):
 ###################################
 
 # Generate 5 styles, keep markerstyle the same for all
-styles = generate_styles(5, markerstyles=[34])
+styles = generate_styles(StyleObject1D, 5, markerstyle=21)
 
 # the overall figure with a grid of 3 columns and 4 rows (default is 1 column and 1 row)
 figure = ROOTFigure(3, 4, size=(600, 600), column_margin=(0.05, 0.025))
