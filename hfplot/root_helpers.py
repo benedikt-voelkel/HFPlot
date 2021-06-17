@@ -5,6 +5,7 @@ import sys
 from math import log10
 
 from ROOT import TH1C, TH1S, TH1I, TH1F, TH1D, TEfficiency, TGraph, TF1, TF12, TF2, TF3 # pylint: disable=no-name-in-module
+from ROOT import TH2C, TH2S, TH2I, TH2F, TH2D # pylint: disable=no-name-in-module
 from ROOT import Double # pylint: disable=no-name-in-module
 
 from hfplot.logger import get_logger
@@ -14,6 +15,7 @@ MIN_LOG_SCALE = 0.00000000001
 
 ROOT_OBJECTS_1D = (TH1C, TH1S, TH1I, TH1F, TH1D, TEfficiency, TGraph, TF1, TF12)
 ROOT_OBJECTS_HIST_1D = (TH1C, TH1S, TH1I, TH1F, TH1D)
+ROOT_OBJECTS_HIST_2D = (TH2C, TH2S, TH2I, TH2F, TH2D)
 # Need to exclude in case of 1D since they are derived from TF1
 ROOT_OBJECTS_NOT_1D = (TF2, TF3)
 
@@ -22,6 +24,13 @@ def is_1d(root_object):
     """
     if isinstance(root_object, ROOT_OBJECTS_1D) \
     and not isinstance(root_object, ROOT_OBJECTS_NOT_1D):
+        return True
+    return False
+
+def is_2d(root_object):
+    """Test whether a ROOT object is 2D histogram-like
+    """
+    if isinstance(root_object, ROOT_OBJECTS_HIST_2D):
         return True
     return False
 
@@ -89,6 +98,12 @@ def detach_from_root_directory(root_object):
     try_method(root_object, "SetDirectory", 0)
 
 
+def create_name(root_object, proposed_name=None):
+    """Quickly find a new unique name for a ROOT object
+    """
+    return get_root_object_store().create_name(root_object, proposed_name)
+
+
 def clone_root(root_object, proposed_name=None, detach=True):
     """Safely clone a ROOT object with new name
 
@@ -101,7 +116,7 @@ def clone_root(root_object, proposed_name=None, detach=True):
     Returns:
         cloned ROOT object
     """
-    proposed_name = get_root_object_store().create_name(root_object, proposed_name)
+    proposed_name = create_name(root_object, proposed_name)
     obj = root_object.Clone(proposed_name)
     if detach:
         detach_from_root_directory(obj)
@@ -120,7 +135,6 @@ def strip_back(hist, n_bins=1):
         hist_clone.SetBinContent(i + 1, 0)
         hist_clone.SetBinError(i + 1, 0)
     return hist_clone
-
 
 
 def find_boundaries_TH1(histo, x_low=None, x_up=None, y_low=None, y_up=None,
@@ -276,8 +290,49 @@ def find_boundaries_TGraph(graph, x_low=None, x_up=None, y_low=None, y_up=None,
     return x_low_new, x_up_new, y_low_new, y_up_new
 
 
-def find_boundaries(objects, x_low=None, x_up=None, y_low=None, y_up=None, x_log=False, # pylint: disable=unused-argument, too-many-branches, too-many-statements
-                    y_log=False, reserve_ndc_top=None, reserve_ndc_bottom=None,
+def find_boundaries_TH2(histo, x_low=None, x_up=None, y_low=None, y_up=None, z_low=None, z_up=None,
+                        x_log=False, y_log=False, z_log=False): # pylint: disable=unused-argument, invalid-name
+    """find the x- and y-axes boundaries specifically for 2D TH2
+
+    Args:
+        histo: TH1 1D histogram to derive boundaries for
+        x_low: float or None (fix to given float if given) otherwise derive from histogram
+        x_up: float or None (fix to given float if given) otherwise derive from histogram
+        y_low: float or None (fix to given float if given) otherwise derive from histogram
+        y_up: float or None (fix to given float if given) otherwise derive from histogram
+
+    Returns:
+        float, float, float, float (derived boundaries)
+    """
+
+    # TODO Quite some code duplication. Fix that
+
+    # Find via projections
+    proj_x = histo.ProjectionX(create_name(histo))
+    proj_y = histo.ProjectionY(create_name(histo))
+
+    x_low_new, x_up_new, _, _ = find_boundaries_TH1(proj_x, x_low, x_up, None, None, x_log=x_log)
+    y_low_new, y_up_new, _, _ = find_boundaries_TH1(proj_y, y_low, y_up, None, None, x_log=y_log)
+
+    x_bin_low, x_bin_up = histo.GetXaxis().FindBin(x_low_new), histo.GetXaxis().FindBin(x_up_new)
+    y_bin_low, y_bin_up = histo.GetYaxis().FindBin(y_low_new), histo.GetYaxis().FindBin(y_up_new)
+
+    z_low_new = sys.float_info.max if z_low is None else z_low
+    z_up_new = sys.float_info.min if z_up is None else z_up
+    for i in range(x_bin_low, x_bin_up + 1):
+        for j in range(y_bin_low, y_bin_up + 1):
+            content = histo.GetBinContent(i, j)
+            if z_low is None:
+                z_low_new = min(content, z_low_new)
+            if z_up is None:
+                z_up_new = max(content, z_up_new)
+
+    return x_low_new, x_up_new, y_low_new, y_up_new, z_low_new, z_up_new
+
+
+def find_boundaries(objects, x_low=None, x_up=None, y_low=None, y_up=None, z_low=None, z_up=None, # pylint: disable=unused-argument, too-many-branches, too-many-statements
+                    x_log=False, y_log=False, z_log=False,
+                    reserve_ndc_top=None, reserve_ndc_bottom=None,
                     x_force_limits=False, y_force_limits=False):
     """Find boundaries for any ROOT objects
 
@@ -316,11 +371,20 @@ def find_boundaries(objects, x_low=None, x_up=None, y_low=None, y_up=None, x_log
         "Fix it by swapping numbers", y_low, y_up)
         y_low, y_up = (y_up, y_low)
 
+    if z_up is not None and z_low is not None and z_up < z_low:
+        # At this point there are numbers for sure.
+        # If specified by the user and in case wrong way round, fix it
+        get_logger().warning("Minimum (%f) is larger than maximum (%f) on z-axis. " \
+        "Fix it by swapping numbers", z_low, z_up)
+        z_low, z_up = (z_up, z_low)
+
     # set largest/lowest float values
     x_low_new = sys.float_info.max
     x_up_new = sys.float_info.min
     y_low_new = sys.float_info.max
     y_up_new = sys.float_info.min
+    z_low_new = sys.float_info.max
+    z_up_new = sys.float_info.min
 
     # set largest/lowest float values for a second search to find boundaries
     # closest to object's contents
@@ -328,10 +392,15 @@ def find_boundaries(objects, x_low=None, x_up=None, y_low=None, y_up=None, x_log
     x_up_new_no_user = sys.float_info.min
     y_low_new_no_user = sys.float_info.max
     y_up_new_no_user = sys.float_info.min
+    z_low_new_no_user = sys.float_info.max
+    z_up_new_no_user = sys.float_info.min
+
+    # whether or not adjust y-limits
+    adjust_y_limits = True
 
     for obj in objects:
         # for each 1D ROOT object find user and non-user-specific boundaries
-        if not is_1d(obj):
+        if not (is_1d(obj) or is_2d(obj)):
             get_logger().warning("Cannot derive limits for object's class %s",
                                  obj.__class__.__name__)
             continue
@@ -352,11 +421,23 @@ def find_boundaries(objects, x_low=None, x_up=None, y_low=None, y_up=None, x_log
                 continue
             x_low_est_no_user, x_up_est_no_user, y_low_est_no_user, y_up_est_no_user = \
             find_boundaries_TGraph(obj, x_log=x_log, y_log=y_log)
+        elif isinstance(obj, ROOT_OBJECTS_HIST_2D):
+            x_low_est, x_up_est, y_low_est, y_up_est, z_low_est, z_up_est = \
+            find_boundaries_TH2(obj, x_low, x_up, y_low, y_up, z_low, z_up, x_log, y_log, z_log)
+            x_low_est_no_user, x_up_est_no_user, y_low_est_no_user, y_up_est_no_user, z_low_est_no_user, z_up_est_no_user = \
+            find_boundaries_TH2(obj, x_log=x_log, y_log=y_log, z_log=z_log)
+            # update boundaries for user-specific settings
+            z_up_new = max(z_up_est, z_up_new)
+            z_low_new = min(z_low_est, z_low_new)
+            # update boundaries for user-independent settings
+            z_up_new_no_user = max(z_up_est_no_user, z_up_new_no_user)
+            z_low_new_no_user = min(z_low_est_no_user, z_low_new_no_user)
+            adjust_y_limits = False
         elif isinstance(obj, TEfficiency):
             get_logger().warning("Finding boundaries for TEfficiency not yet implemented")
             continue
         else:
-            get_logger().warning("Unknown 1D class %s",
+            get_logger().warning("Unknown class %s",
                                  obj.__class__.__name__)
             continue
 
@@ -371,7 +452,6 @@ def find_boundaries(objects, x_low=None, x_up=None, y_low=None, y_up=None, x_log
         x_low_new_no_user = min(x_low_est_no_user, x_low_new_no_user)
         y_up_new_no_user = max(y_up_est_no_user, y_up_new_no_user)
         y_low_new_no_user = min(y_low_est_no_user, y_low_new_no_user)
-
 
     if y_up is not None and y_up_new < y_up_new_no_user and not y_force_limits:
         # only do it if y-limits are not forced
@@ -396,24 +476,24 @@ def find_boundaries(objects, x_low=None, x_up=None, y_low=None, y_up=None, x_log
         if y_low_new_no_user <= 0:
             y_low_new_no_user = MIN_LOG_SCALE
 
-
     # Adjust a bit top and bottom otherwise maxima and minima will exactly touch the x-axis
-    if y_log:
-        y_diff = log10(y_up_new) - log10(y_low_new)
-    else:
-        y_diff = y_up_new - y_low_new
-
-    if y_low is None and reserve_ndc_bottom is None:
+    if adjust_y_limits:
         if y_log:
-            y_low_new = 10**(log10(y_low_new) - y_diff * 0.1)
+            y_diff = log10(y_up_new) - log10(y_low_new)
         else:
-            y_low_new -= 0.1 * y_diff
+            y_diff = y_up_new - y_low_new
 
-    if y_up is None and reserve_ndc_top is None:
-        if y_log:
-            y_up_new = 10**(log10(y_up_new) + y_diff * 0.1)
-        else:
-            y_up_new += 0.1 * y_diff
+        if y_low is None and reserve_ndc_bottom is None:
+            if y_log:
+                y_low_new = 10**(log10(y_low_new) - y_diff * 0.1)
+            else:
+                y_low_new -= 0.1 * y_diff
+
+        if y_up is None and reserve_ndc_top is None:
+            if y_log:
+                y_up_new = 10**(log10(y_up_new) + y_diff * 0.1)
+            else:
+                y_up_new += 0.1 * y_diff
 
     # Now force the limits if requested
     if x_force_limits and x_low is not None and x_up is not None:
@@ -424,6 +504,18 @@ def find_boundaries(objects, x_low=None, x_up=None, y_low=None, y_up=None, x_log
         y_low_new = y_low
         y_up_new = y_up
 
+    # if z_force_limits and z_low is not None and z_up is not None:
+    #     z_low_new = z_low
+    #     z_up_new = z_up
+
+
+    if z_low_new <= 0 and z_log:
+        # If not compatible with log scale, force it to be
+        # Can happen if fixed by user - but incompatible -
+        # and at the same time log scale is requested
+        get_logger().warning("Have to set z-minimum to something larger than 0 since log-scale " \
+        "is requested. Set value was %f and reset value is now %f", z_low_new, MIN_LOG_SCALE)
+        z_low_new = MIN_LOG_SCALE
 
     if y_low_new <= 0 and y_log:
         # If not compatible with log scale, force it to be
@@ -440,7 +532,6 @@ def find_boundaries(objects, x_low=None, x_up=None, y_low=None, y_up=None, x_log
         get_logger().warning("Have to set x-minimum to something larger than 0 since log-scale " \
         "is requested. Set value was %f and reset value is now %f", x_low_new, MIN_LOG_SCALE)
         x_low_new = MIN_LOG_SCALE
-
 
     # compute what we need for the legend
     if reserve_ndc_top and not y_force_limits:
@@ -475,4 +566,4 @@ def find_boundaries(objects, x_low=None, x_up=None, y_low=None, y_up=None, x_log
                 y_diff_with_legend = y_diff / (1 - reserve_ndc_bottom)
                 y_low_new = y_up_new - y_diff_with_legend - 0.1 * y_diff
 
-    return x_low_new, x_up_new, y_low_new, y_up_new
+    return x_low_new, x_up_new, y_low_new, y_up_new, z_low_new, z_up_new

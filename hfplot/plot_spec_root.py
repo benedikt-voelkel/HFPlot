@@ -217,10 +217,11 @@ class ROOTPlot(PlotSpec): # pylint: disable=too-many-instance-attributes
         # pylint: enable=protected-access
 
         # Find the x- and y-limits for this plot
-        x_low, x_up, y_low, y_up = \
+        x_low, x_up, y_low, y_up, z_low, z_up = \
         find_boundaries(self.objects, self._axes[0].limits[0],
         self._axes[0].limits[1], self._axes[1].limits[0],
-        self._axes[1].limits[1],
+        self._axes[1].limits[1], self._axes[2].limits[0],
+        self._axes[2].limits[1],
         reserve_ndc_top=kwargs.pop("reserve_ndc_top", None),
         reserve_ndc_bottom=kwargs.pop("reserve_ndc_bottom", None), x_force_limits=x_force_limits,
         y_force_limits=y_force_limits, x_log=self._axes[0].is_log, y_log=self._axes[1].is_log)
@@ -245,6 +246,8 @@ class ROOTPlot(PlotSpec): # pylint: disable=too-many-instance-attributes
         self._axes[0].limits[1] = x_up
         self._axes[1].limits[0] = y_low
         self._axes[1].limits[1] = y_up
+        self._axes[2].limits[0] = z_low
+        self._axes[2].limits[1] = z_up
 
         # Give the frame a unique name, for now just because we do it for
         # ROOT related object
