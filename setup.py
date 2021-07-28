@@ -64,7 +64,7 @@ setup(
   # for example:
   # $ pip install -e .[dev,test]
   extras_require={
-    "test": ["pylint>=2.6.2"]
+    "test": ["pylint>=2.6.2", "pytest>=6.2.2"]
   },
 
   # If there are data files included in your packages that need to be
