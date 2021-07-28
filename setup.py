@@ -55,7 +55,7 @@ setup(
   # your project is installed. For an analysis of "install_requires" vs pip's
   # requirements files see:
   # https://packaging.python.org/en/latest/requirements.html
-  install_requires=[ "numpy"],
+  install_requires=["numpy"],
 
   python_requires='>=3.6',
 
@@ -64,19 +64,20 @@ setup(
   # for example:
   # $ pip install -e .[dev,test]
   extras_require={
+    "test": ["pylint>=2.6.2"]
   },
 
   # If there are data files included in your packages that need to be
   # installed, specify them here. Note that you need to specify those files in
   # MANIFEST.in as well, since Python tools behave inconsistently
   # include_package_data=True,
-  # package_data={ "machine_learning_hep.submission": [ "default_complete.yml",
-  #                                                     "default_ana.yml",
-  #                                                     "default_apply.yml",
-  #                                                     "default_pre.yml",
-  #                                                     "default_train.yml" ],
-  #                "machine_learning_hep.data": [ "config_model_parameters.yml",
-  #                                               "database_run_list.yml" ] },
+  # package_data={ "hfplot.data_1": [ "data.yml",
+  #                                   "data.yml",
+  #                                   "data.yml",
+  #                                   "data.yml",
+  #                                   "data.yml" ],
+  #                "hfplot.data_2": [ "data.yml",
+  #                                   "data.yml" ] },
 
   # Although 'package_data' is the preferred approach, in some case you may
   # need to place data files outside of your packages. See:
@@ -91,6 +92,6 @@ setup(
 
 
   # entry_points={
-  #     "console_scripts": [ "hfplot = hfplot.aliplot:main" ]
+  #     "console_scripts": [ "hfplot = hfplot.cli:main" ]
   # }
 )
