@@ -1,14 +1,13 @@
 """Implementing specialised plot specifications for ROOT
 """
 
-from math import sqrt
-
 from ROOT import TCanvas, TLegend, TPad, TPaveText, TLine # pylint: disable=no-name-in-module
 from ROOT import gROOT, gDirectory, gPad, TDirectory # pylint: disable=no-name-in-module
 
 from hfplot.plot_spec import FigureSpec, PlotSpec
 
 from hfplot.root_helpers import clone_root, find_boundaries, get_root_object_store
+from hfplot.root_helpers import apply_line_style, style_object
 from hfplot.utilities import map_value, try_method
 
 gROOT.SetBatch()
@@ -62,41 +61,6 @@ class ROOTPlot(PlotSpec): # pylint: disable=too-many-instance-attributes
             draw_option = "same" if not sty else f"same {sty.draw_options}"
             obj.Draw(draw_option)
 
-    def __apply_line_style(self, root_object, style):
-        """Apply line style
-        """
-        # TODO Maybe check if derives from TAttLine
-        # TODO Could become static
-        if style.linestyle is not None:
-            root_object.SetLineStyle(style.linestyle)
-        if style.linewidth is not None:
-            root_object.SetLineWidth(style.linewidth)
-        if style.linecolor is not None:
-            root_object.SetLineColor(style.linecolor)
-
-    def __apply_marker_style(self, root_object, style):
-        """Apply marker style
-        """
-        # TODO Maybe check if derives from TAttMarker
-        # TODO Could become static
-        if style.markersize is not None:
-            root_object.SetMarkerSize(style.markersize)
-        if style.markerstyle is not None:
-            root_object.SetMarkerStyle(style.markerstyle)
-        if style.markercolor is not None:
-            root_object.SetMarkerColor(style.markercolor)
-
-    def __apply_fill_style(self, root_object, style):
-        """Apply fill style
-        """
-        # TODO Maybe check if derives from TAttFill
-        # TODO Could become static
-        if style.fillstyle is not None:
-            root_object.SetFillStyle(style.fillstyle)
-        if style.fillcolor is not None:
-            root_object.SetFillColor(style.fillcolor)
-        if style.fillalpha is not None and style.fillcolor is not None and style.fillalpha < 1.:
-            root_object.SetFillColorAlpha(style.fillcolor, style.fillalpha)
 
     def __draw_lines(self):
         """Draw all lines
@@ -112,10 +76,10 @@ class ROOTPlot(PlotSpec): # pylint: disable=too-many-instance-attributes
             y_up = l.y_up
             if l.y_orientation == "relative":
                 y_range = self._axes[1].limits[1] - self._axes[1].limits[0]
-                y_low = self._axes[1].limits[0] + l.y_low * x_range
-                y_up = self._axes[1].limits[0] + l.y_up * x_range
+                y_low = self._axes[1].limits[0] + l.y_low * y_range
+                y_up = self._axes[1].limits[0] + l.y_up * y_range
             line = TLine(x_low, y_low, x_up, y_up)
-            self.__apply_line_style(line, l.style)
+            apply_line_style(line, l.style)
             line.Draw()
             self._root_lines.append(line)
 
@@ -125,24 +89,6 @@ class ROOTPlot(PlotSpec): # pylint: disable=too-many-instance-attributes
         """
         if self.root_legend:
             self.root_legend.Draw()
-
-
-    def __style_object(self, obj, style, scale=1):
-        """Style one object
-
-        Args:
-            obj: ROOTPlot to be styled
-            style: Style to be used for this ROOTPlot
-            scale: float to scale e.g. marker sizes, default 1
-        """
-        if not style:
-            # immediately return
-            return
-        # call one style method of the object after the other
-        # TODO might need to be specific for certain ROOT classes
-        self.__apply_line_style(obj, style)
-        self.__apply_marker_style(obj, style)
-        self.__apply_fill_style(obj, style)
 
 
     def __style_objects(self, **kwargs):
@@ -155,9 +101,9 @@ class ROOTPlot(PlotSpec): # pylint: disable=too-many-instance-attributes
         """
         # TODO Make that static again
         keep_stats = kwargs.pop("keep_stats", False)
-        scale = sqrt(self.size[0] * self.size[1] / SCALE_BASE)
+        #scale = sqrt(self.size[0] * self.size[1] / SCALE_BASE)
         for obj, style in zip(self.objects, self.styles):
-            self.__style_object(obj, style, scale)
+            style_object(obj, style) # , scale)
             if not keep_stats:
                 try_method(obj, "SetStats", 0)
 
@@ -224,7 +170,8 @@ class ROOTPlot(PlotSpec): # pylint: disable=too-many-instance-attributes
         self._axes[2].limits[1],
         reserve_ndc_top=kwargs.pop("reserve_ndc_top", None),
         reserve_ndc_bottom=kwargs.pop("reserve_ndc_bottom", None), x_force_limits=x_force_limits,
-        y_force_limits=y_force_limits, x_log=self._axes[0].is_log, y_log=self._axes[1].is_log)
+        y_force_limits=y_force_limits, x_log=self._axes[0].is_log, y_log=self._axes[1].is_log,
+        y_account_for_errors=self._axes[1].account_for_errors)
 
         # add titles to axes if not specified by the user by trying to
         # use those which are set for any ROOT object
@@ -239,7 +186,8 @@ class ROOTPlot(PlotSpec): # pylint: disable=too-many-instance-attributes
                     break
 
         # Finally create the frame for this plot
-        frame_string = f";{self._axes[0].title};{self._axes[1].title}"
+        frame_title = self._title if self._title else ""
+        frame_string = f"{frame_title};{self._axes[0].title};{self._axes[1].title}"
         self.frame = self.pad.DrawFrame(x_low, y_low, x_up, y_up,
                                         frame_string)
         self._axes[0].limits[0] = x_low

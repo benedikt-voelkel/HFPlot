@@ -4,8 +4,18 @@
 from copy import deepcopy
 
 from hfplot.logger import get_logger, configure_logger
+from hfplot.plot_helpers import make_margins
+from hfplot.style import LineStyle
 
 configure_logger(True)
+
+
+class BoundarySearch: # pylint: disable=too-few-public-methods
+    """Configure the boundary search
+    """
+    def __init__(self):
+        self.account_for_errors = [True, True, True]
+
 
 class TextSpec: # pylint: disable=too-few-public-methods
     """Text specification
@@ -29,6 +39,8 @@ class AxisSpec: # pylint: disable=too-many-instance-attributes, too-few-public-m
         self.title_size = 0.02
         self.tick_size = 0.01
         self.is_log = False
+        self.account_for_errors = True
+
 
 class LegendSpec: # pylint: disable=too-many-instance-attributes, too-few-public-methods
     """Legend specification
@@ -39,10 +51,12 @@ class LegendSpec: # pylint: disable=too-many-instance-attributes, too-few-public
         self.n_columns = 1
         self.principal_position = None
 
-class LineSpec:
+
+class LineSpec: # pylint: disable=too-few-public-methods
     """Line specification
     """
-    def __init__(self, x_low, x_up, y_low, y_up, x_orientation="relative", y_orientation="relative"):
+    def __init__(self, x_low, x_up, y_low, y_up,
+                 x_orientation="relative", y_orientation="relative"):
         self.x_low = x_low
         self.x_up = x_up
         self.y_low = y_low
@@ -85,6 +99,9 @@ class PlotSpec: # pylint: disable=too-few-public-methods, too-many-instance-attr
         self._share_x = None
         self._share_y = None
 
+        # title
+        self._title = None
+
         # quickly refer to logger
         self.logger = get_logger()
 
@@ -107,6 +124,7 @@ class PlotSpec: # pylint: disable=too-few-public-methods, too-many-instance-attr
         self._legend_spec = deepcopy(orig._legend_spec)
         self._share_x = orig._share_x
         self._share_y = orig._share_y
+        self._title = orig._title
         # pylint: enable=protected-access
 
     def add_text(self, text, x_low, y_low, size=0.04):
@@ -119,7 +137,8 @@ class PlotSpec: # pylint: disable=too-few-public-methods, too-many-instance-attr
         """
         self._texts.append(TextSpec(text, x_low, y_low, size))
 
-    def add_line(self, x_low=None, x_up=None, y_low=None, y_up=None, x_orientation="relative", y_orientation="relative"):
+    def add_line(self, x_low=None, x_up=None, y_low=None, y_up=None,
+                 x_orientation="relative", y_orientation="relative"):
         """Add a text to be added to this plot
 
         Args:
@@ -219,8 +238,8 @@ class FigureSpec: # pylint: disable=too-many-instance-attributes
         self.__make_width_ratios(width_ratios)
 
         # construct margins of rows and columns
-        self.__make_row_margins(kwargs.pop("row_margin", 0.025))
-        self.__make_column_margins(kwargs.pop("column_margin", 0.025))
+        self.__make_row_margins(kwargs.pop("row_margin", 0.05))
+        self.__make_column_margins(kwargs.pop("column_margin", 0.05))
 
         # remember which cells are taken already
         self.cells_taken = []
@@ -281,31 +300,7 @@ class FigureSpec: # pylint: disable=too-many-instance-attributes
         Args:
             margins: iterable of floats or iterable of 2-tuple of floats
         """
-        try:
-            iter(margins)
-        except TypeError:
-            # This seems to be only a scalar
-            self._row_margins = [(margins, margins)] * self.n_rows
-            return
-
-        try:
-            iter(margins[0])
-        except TypeError as type_error:
-            # This seems to be one single iterable object
-            if len(margins) != 2:
-                raise ValueError("Need tuple/list with 2 entries for top and bottom margin") \
-                from type_error
-            self._row_margins = [margins] * self.n_rows
-            return
-
-        # Now it is actually an iterable
-        if len(margins) != self.n_rows:
-            raise ValueError(f"Need as many tuples/lists ({len(margins)} " \
-            f"as number of rows ({self.n_rows})")
-        for m in margins:
-            if len(m) != 2:
-                raise ValueError("Need tuple/list with 2 entries for top and bottom margin")
-        self._row_margins = margins
+        self._row_margins = make_margins(margins, self.n_rows)
 
 
     def __make_column_margins(self, margins):
@@ -314,31 +309,7 @@ class FigureSpec: # pylint: disable=too-many-instance-attributes
         Args:
             margins: iterable of floats or iterable of 2-tuple of floats
         """
-        try:
-            iter(margins)
-        except TypeError:
-            # This seems to be only a scalar
-            self._column_margins = [(margins, margins)] * self.n_cols
-            return
-
-        try:
-            iter(margins[0])
-        except TypeError as type_error:
-            # This seems to be one single iterable object
-            if len(margins) != 2:
-                raise ValueError("Need tuple/list with 2 entries for left and right margin") \
-                from type_error
-            self._column_margins = [margins] * self.n_cols
-            return
-
-        # Now it is actually an iterable
-        if len(margins) != self.n_cols:
-            raise ValueError(f"Need as many tuples/lists ({len(margins)} " \
-            f"as number of columns ({self.n_cols})")
-        for m in margins:
-            if len(m) != 2:
-                raise ValueError("Need tuple/list with 2 entries for left and right margin")
-        self._column_margins = margins
+        self._column_margins = make_margins(margins, self.n_cols)
 
 
     def __add_cell(self, cell):
@@ -458,6 +429,7 @@ class FigureSpec: # pylint: disable=too-many-instance-attributes
         kwargs.pop("z_log", self._current_plot_spec._axes[2].is_log)
         self._current_plot_spec._share_x = kwargs.pop("share_x", None)
         self._current_plot_spec._share_y = kwargs.pop("share_y", None)
+        self._current_plot_spec._title = kwargs.pop("title", None)
         # pylint: enable=protected-access, protected-access
 
 
@@ -477,10 +449,17 @@ class FigureSpec: # pylint: disable=too-many-instance-attributes
             PlotSpec
                 created PlotSpec
         """
+        if self.n_cols == 1 and self.n_rows == 1 and self._current_plot_spec:
+            # already defined
+            self.consume_plot_kwargs(**kwargs)
+            return self._current_plot_spec
+
 
         if not cols_rows:
             # just find the next free cell
             cell = list((set(range(self.n_cols * self.n_rows)) - set(self.cells_taken)))
+            if not cell:
+                raise IndexError("No free cells left for automatic plot definition")
             # sort because the difference puts the last number at the from when it reaches
             # more than 50% of cells taken
             cell.sort()
@@ -553,7 +532,8 @@ class FigureSpec: # pylint: disable=too-many-instance-attributes
             return
         self._current_plot_spec.add_text(text, x_low, y_low, size)
 
-    def add_line(self, x_low=None, x_up=None, y_low=None, y_up=None, x_orientation="relative", y_orientation="relative"):
+    def add_line(self, x_low=None, x_up=None, y_low=None, y_up=None,
+                 x_orientation="relative", y_orientation="relative"):
         """Add a text to be added to the current plot
 
         Args:

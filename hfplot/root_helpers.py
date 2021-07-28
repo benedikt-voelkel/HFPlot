@@ -122,23 +122,23 @@ def clone_root(root_object, proposed_name=None, detach=True):
         detach_from_root_directory(obj)
     return obj
 
-def strip_front(hist, n_bins=1):
-    hist_clone = clone_root(hist)
-    for i in range(n_bins):
-        hist_clone.SetBinContent(i + 1, 0)
-        hist_clone.SetBinError(i + 1, 0)
-    return hist_clone
+# def strip_front(hist, n_bins=1):
+#     hist_clone = clone_root(hist)
+#     for i in range(n_bins):
+#         hist_clone.SetBinContent(i + 1, 0)
+#         hist_clone.SetBinError(i + 1, 0)
+#     return hist_clone
+#
+# def strip_back(hist, n_bins=1):
+#     hist_clone = clone_root(hist)
+#     for i in range(hist_clone.GetNbinsX() - n_bins, hist_clone.GetNbinsX()):
+#         hist_clone.SetBinContent(i + 1, 0)
+#         hist_clone.SetBinError(i + 1, 0)
+#     return hist_clone
 
-def strip_back(hist, n_bins=1):
-    hist_clone = clone_root(hist)
-    for i in range(hist_clone.GetNbinsX() - n_bins, hist_clone.GetNbinsX()):
-        hist_clone.SetBinContent(i + 1, 0)
-        hist_clone.SetBinError(i + 1, 0)
-    return hist_clone
 
-
-def find_boundaries_TH1(histo, x_low=None, x_up=None, y_low=None, y_up=None,
-                        x_log=False, y_log=False): # pylint: disable=unused-argument, invalid-name
+def find_boundaries_TH1(histo, x_low=None, x_up=None, y_low=None, y_up=None, # pylint: disable=invalid-name
+                        x_log=False, y_log=False, y_account_for_errors=True):
     """find the x- and y-axes boundaries specifically for 1D TH1
 
     Args:
@@ -184,30 +184,30 @@ def find_boundaries_TH1(histo, x_low=None, x_up=None, y_low=None, y_up=None,
                 break
 
     if y_low is None:
-        # go bin by bin and take y-errors into account
-        y_low = histo.GetBinContent(start_bin) - histo.GetBinError(start_bin)
-        for i in range(start_bin, end_bin + 1):
-            if not histo.GetBinContent(i):
-                continue
-            min_tmp = histo.GetBinContent(i) - histo.GetBinError(i)
-            if min_tmp <= 0 and y_log:
-                continue
-            y_low = min(min_tmp, y_low)
+        if y_account_for_errors:
+            values = [histo.GetBinContent(i) - histo.GetBinError(i) \
+            for i in range(start_bin, end_bin + 1)]
+        else:
+            values = [histo.GetBinContent(i) for i in range(start_bin, end_bin + 1)]
+        if y_log:
+            values = [v for v in values if v > 0]
+        y_low = min(values) if values else MIN_LOG_SCALE
 
     if y_up is None:
-        # go bin by bin and take y-errors into account
-        y_up = histo.GetBinContent(start_bin) + histo.GetBinError(start_bin)
-        for i in range(start_bin, end_bin + 1):
-            if not histo.GetBinContent(i):
-                continue
-            max_tmp = histo.GetBinContent(i) + histo.GetBinError(i)
-            y_up = max(max_tmp, y_up)
+        if y_account_for_errors:
+            values = [histo.GetBinContent(i) + histo.GetBinError(i) \
+            for i in range(start_bin, end_bin + 1)]
+        else:
+            values = [histo.GetBinContent(i) for i in range(start_bin, end_bin + 1)]
+        if y_log:
+            values = [v for v in values if v > 0]
+        y_up = max(values)
 
     return x_low, x_up, y_low, y_up
 
 
-def find_boundaries_TF1(func, x_low=None, x_up=None, y_low=None, y_up=None,
-                        x_log=False, y_log=False): # pylint: disable=invalid-name
+def find_boundaries_TF1(func, x_low=None, x_up=None, y_low=None, y_up=None, # pylint: disable=invalid-name
+                        x_log=False, y_log=False): # pylint: disable=unused-argument
     """find the x- and y-axes boundaries specifically for 1D TF1
 
     Args:
@@ -240,8 +240,8 @@ def find_boundaries_TF1(func, x_low=None, x_up=None, y_low=None, y_up=None,
     return x_low, x_up, y_low, y_up
 
 
-def find_boundaries_TGraph(graph, x_low=None, x_up=None, y_low=None, y_up=None,
-                           x_log=False, y_log=False): # pylint: disable=invalid-name
+def find_boundaries_TGraph(graph, x_low=None, x_up=None, y_low=None, y_up=None, # pylint: disable=invalid-name
+                           x_log=False, y_log=False): # pylint: disable=unused-argument
     """find the x- and y-axes boundaries specifically for 1D TGraph
 
     Args:
@@ -290,8 +290,8 @@ def find_boundaries_TGraph(graph, x_low=None, x_up=None, y_low=None, y_up=None,
     return x_low_new, x_up_new, y_low_new, y_up_new
 
 
-def find_boundaries_TH2(histo, x_low=None, x_up=None, y_low=None, y_up=None, z_low=None, z_up=None,
-                        x_log=False, y_log=False, z_log=False): # pylint: disable=unused-argument, invalid-name
+def find_boundaries_TH2(histo, x_low=None, x_up=None, y_low=None, y_up=None, z_low=None, z_up=None, # pylint: disable=unused-argument, invalid-name
+                        x_log=False, y_log=False, z_log=False): # pylint: disable=unused-argument
     """find the x- and y-axes boundaries specifically for 2D TH2
 
     Args:
@@ -333,7 +333,7 @@ def find_boundaries_TH2(histo, x_low=None, x_up=None, y_low=None, y_up=None, z_l
 def find_boundaries(objects, x_low=None, x_up=None, y_low=None, y_up=None, z_low=None, z_up=None, # pylint: disable=unused-argument, too-many-branches, too-many-statements
                     x_log=False, y_log=False, z_log=False,
                     reserve_ndc_top=None, reserve_ndc_bottom=None,
-                    x_force_limits=False, y_force_limits=False):
+                    x_force_limits=False, y_force_limits=False, y_account_for_errors=True):
     """Find boundaries for any ROOT objects
 
     Args:
@@ -406,9 +406,11 @@ def find_boundaries(objects, x_low=None, x_up=None, y_low=None, y_up=None, z_low
             continue
         if isinstance(obj, ROOT_OBJECTS_HIST_1D):
             x_low_est, x_up_est, y_low_est, y_up_est = \
-            find_boundaries_TH1(obj, x_low, x_up, y_low, y_up, x_log, y_log)
+            find_boundaries_TH1(obj, x_low, x_up, y_low, y_up, x_log, y_log,
+                                y_account_for_errors=y_account_for_errors)
             x_low_est_no_user, x_up_est_no_user, y_low_est_no_user, y_up_est_no_user = \
-            find_boundaries_TH1(obj, x_log=x_log, y_log=y_log)
+            find_boundaries_TH1(obj, x_log=x_log, y_log=y_log,
+                                y_account_for_errors=y_account_for_errors)
         elif isinstance(obj, TF1) and not isinstance(obj, ROOT_OBJECTS_NOT_1D):
             x_low_est, x_up_est, y_low_est, y_up_est = \
             find_boundaries_TF1(obj, x_low, x_up, y_low, y_up, x_log, y_log)
@@ -425,7 +427,7 @@ def find_boundaries(objects, x_low=None, x_up=None, y_low=None, y_up=None, z_low
             x_low_est, x_up_est, y_low_est, y_up_est, z_low_est, z_up_est = \
             find_boundaries_TH2(obj, x_low, x_up, y_low, y_up, z_low, z_up, x_log, y_log, z_log)
             x_low_est_no_user, x_up_est_no_user, y_low_est_no_user, y_up_est_no_user, z_low_est_no_user, z_up_est_no_user = \
-            find_boundaries_TH2(obj, x_log=x_log, y_log=y_log, z_log=z_log)
+            find_boundaries_TH2(obj, x_log=x_log, y_log=y_log, z_log=z_log) # pylint: disable=line-too-long
             # update boundaries for user-specific settings
             z_up_new = max(z_up_est, z_up_new)
             z_low_new = min(z_low_est, z_low_new)
@@ -567,3 +569,57 @@ def find_boundaries(objects, x_low=None, x_up=None, y_low=None, y_up=None, z_low
                 y_low_new = y_up_new - y_diff_with_legend - 0.1 * y_diff
 
     return x_low_new, x_up_new, y_low_new, y_up_new, z_low_new, z_up_new
+
+
+def apply_line_style(root_object, style):
+    """Apply line style
+    """
+    # TODO Maybe check if derives from TAttLine
+    # TODO Could become static
+    if style.linestyle is not None:
+        root_object.SetLineStyle(style.linestyle)
+    if style.linewidth is not None:
+        root_object.SetLineWidth(style.linewidth)
+    if style.linecolor is not None:
+        root_object.SetLineColor(style.linecolor)
+
+def apply_marker_style(root_object, style):
+    """Apply marker style
+    """
+    # TODO Maybe check if derives from TAttMarker
+    # TODO Could become static
+    if style.markersize is not None:
+        root_object.SetMarkerSize(style.markersize)
+    if style.markerstyle is not None:
+        root_object.SetMarkerStyle(style.markerstyle)
+    if style.markercolor is not None:
+        root_object.SetMarkerColor(style.markercolor)
+
+def apply_fill_style(root_object, style):
+    """Apply fill style
+    """
+    # TODO Maybe check if derives from TAttFill
+    # TODO Could become static
+    if style.fillstyle is not None:
+        root_object.SetFillStyle(style.fillstyle)
+    if style.fillcolor is not None:
+        root_object.SetFillColor(style.fillcolor)
+    if style.fillalpha is not None and style.fillcolor is not None and style.fillalpha < 1.:
+        root_object.SetFillColorAlpha(style.fillcolor, style.fillalpha)
+
+
+def style_object(root_object, style):
+    """Style one object
+
+    Args:
+        root_object: ROOTPlot to be styled
+        style: Style to be used for this ROOTPlot
+    """
+    if not style:
+        # immediately return
+        return
+    # call one style method of the object after the other
+    # TODO might need to be specific for certain ROOT classes
+    apply_line_style(root_object, style)
+    apply_marker_style(root_object, style)
+    apply_fill_style(root_object, style)

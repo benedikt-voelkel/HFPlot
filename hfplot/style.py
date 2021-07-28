@@ -1,7 +1,7 @@
 """Style handling
 """
 
-from copy import copy
+from copy import copy, deepcopy
 
 from ROOT import kCyan, kPink, kBlue, kTeal, kYellow, kOrange # pylint: disable=no-name-in-module
 
@@ -29,10 +29,19 @@ DRAW_OPTIONS_DEFAULTS = [""]
 
 
 def generate_styles(style_class, n_styles=1, **kwargs):
+    """Generate a certain number of a given styles
+
+    Args:
+        style_class: class of object to be constructed
+        n_styles: int number of styles to be created
+
+    Returns:
+        list of styles
+    """
     # Generate number of requested styles
     styles = [style_class() for _ in range(n_styles)]
     # Get the defaults of this class
-    defaults = style_class.defaults
+    defaults = deepcopy(style_class.defaults)
 
     for k in defaults:
         # Overwrite defaults by potential user input
@@ -42,7 +51,8 @@ def generate_styles(style_class, n_styles=1, **kwargs):
         # Go through all style options
         for i, style in enumerate(styles):
             if not hasattr(style, k):
-                get_logger().warning("Unknown attribute %s of style class %s", k, style_class.__name__)
+                get_logger().warning("Unknown attribute %s of style class %s",
+                                     k, style_class.__name__)
                 continue
             try:
                 # Option might come as an iterable
@@ -55,7 +65,10 @@ def generate_styles(style_class, n_styles=1, **kwargs):
             setattr(style, k, chosen_style)
     return styles
 
-class LineStyle:
+
+class LineStyle: # pylint: disable=too-few-public-methods
+    """Definition of line style
+    """
     defaults = {"linewidth": [2],
                 "linestyle": [1, 7, 10],
                 "linecolor": copy(COLOR_DEFAULTS)}
@@ -65,7 +78,9 @@ class LineStyle:
         self.linecolor = None
 
 
-class MarkerStyle:
+class MarkerStyle: # pylint: disable=too-few-public-methods
+    """Definition of marker style
+    """
     defaults = {"markersize": [1],
                 "markerstyle": [20, 21, 22, 23, 34],
                 "markercolor": copy(COLOR_DEFAULTS)}
@@ -75,9 +90,12 @@ class MarkerStyle:
         self.markercolor = None
 
 
-class FillStyle:
+class FillStyle: # pylint: disable=too-few-public-methods
+    """Definition of fill style
+    """
     # matplotlibify
     # https://root.cern.ch/doc/master/TAttFill_8h_source.html#l00039
+    # TODO That is very ROOT specifiy as it uses ROOT's style codes
     FILLSTYLES_DICT = {"empty": 0, "solid": 1, "dotted": 3001, "hatched": 3004}
     defaults = {"fillstyle": [FILLSTYLES_DICT["empty"]],
                 "fillcolor": copy(COLOR_DEFAULTS),
@@ -118,7 +136,7 @@ class StyleObject1D(LineStyle, MarkerStyle, FillStyle): # pylint: disable=too-ma
                 "fillstyle": [FILLSTYLES_DICT["empty"]],
                 "fillcolor": copy(COLOR_DEFAULTS),
                 "fillalpha": [1]}
-    def __init__(self):
+    def __init__(self, **kwargs):
         LineStyle.__init__(self)
         MarkerStyle.__init__(self)
         FillStyle.__init__(self)
@@ -126,3 +144,7 @@ class StyleObject1D(LineStyle, MarkerStyle, FillStyle): # pylint: disable=too-ma
         # self.markerstyle = None
         # self.fillstyle = None
         self.draw_options = None
+
+        for k, v in kwargs.items():
+            if hasattr(self, k):
+                setattr(self, k, v)
