@@ -1,6 +1,8 @@
 """Implementing specialised plot specifications for ROOT
 """
 
+import hfplot.test_root
+
 from ROOT import TCanvas, TLegend, TPad, TPaveText, TLine # pylint: disable=no-name-in-module
 from ROOT import gROOT, gDirectory, gPad, TDirectory # pylint: disable=no-name-in-module
 

@@ -41,7 +41,9 @@ ci/run-tests.sh --tests pytest
 ```
 If that fails, most likely your developments broke something. Please make sure that these tests pass before you open a PR.
 
+## Examples
 
+You can immediately jump into the [examples](./examples) and have a look. If you want further technical explanations, just keep reading.
 
 ## Structure and usage
 
@@ -125,7 +127,6 @@ plot.legend(position="top left") # changes the legend position to top-right
 plot.legend(position=(0.5, 0.7, 0.8, 0.9)) # changes the legend position according to how ROOT does it
 
 ```
-
 
 
 ### How `ROOT` is wrapped here
@@ -228,9 +229,7 @@ figure.save("/path/to/save")
 ```
 
 
-## Examples
 
-For now please refer to the [example](./examples) directory.
 
 
 ## ToDo

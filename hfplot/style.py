@@ -1,8 +1,10 @@
 """Style handling
 """
+import hfplot.test_root
 
 from copy import copy, deepcopy
 
+# TODO This is ROOT specific and has to go soon
 from ROOT import kCyan, kPink, kBlue, kTeal, kYellow, kOrange # pylint: disable=no-name-in-module
 
 from hfplot.logger import get_logger

@@ -1,6 +1,8 @@
 """ROOT helper utilities
 """
 
+import hfplot.test_root
+
 import sys
 from math import log10
 
